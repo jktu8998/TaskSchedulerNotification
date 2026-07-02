@@ -1,5 +1,58 @@
+# ====== .NET ======
 bin/
 obj/
-/packages/
-riderModule.iml
-/_ReSharper.Caches/
+*.user
+*.suo
+*.cache
+*.vs/
+*.DotSettings.user
+*.nupkg
+**/packages/
+
+# ====== Rider ======
+.idea/
+*.sln.iml
+*.suo
+*.user
+*.cache
+*.DotSettings
+*.DotSettings.user
+
+# ====== VS Code ======
+.vscode/
+
+# ====== Docker ======
+docker-compose.override.yml
+pgdata/
+
+# ====== Environment ======
+appsettings.*.local.json
+*.env
+*.env.local
+
+# ====== Logs ======
+logs/
+*.log
+
+# ====== OS files (Ubuntu / Linux / Mac) ======
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# ====== Test results ======
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+# ====== Secrets ======
+secrets.json
+*.pfx
+*.key
+*.crt
+
+# ====== NuGet ======
+*.nuget.g.props
+*.nuget.g.targets
