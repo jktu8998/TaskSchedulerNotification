@@ -37,6 +37,8 @@ public sealed class ScheduledTask
     // События домена
     private readonly List<IDomainEvent> _domainEvents = new();
     public IReadOnlyCollection<IDomainEvent> DomainEvents => _domainEvents.AsReadOnly();
+    
+    public int CurrentAttempt { get; private set; }
 
     // Пустой конструктор для маппинга из БД (Dapper)
     private ScheduledTask() { }
@@ -79,7 +81,7 @@ public sealed class ScheduledTask
         CreatedAt = utcNow;
         UpdatedAt = utcNow;
         LockedUntil = null;
-
+        CurrentAttempt = 0;
         _domainEvents.Add(new TaskCreatedEvent(this));
     }
 
@@ -139,17 +141,20 @@ public sealed class ScheduledTask
     }
 
     /// <summary>
-    /// Помечает задание как проваленное (но ещё есть попытки) или перемещает в Dead Letter Queue.
-    /// Снимает блокировку.
+    /// Помечает задание как проваленное после неудачной попытки выполнения.
+    /// Сущность САМА считает попытки и решает, уйти в Dead или остаться в Failed.
+    /// Вызывающая сторона просто сообщает: "задание упало".
     /// </summary>
-    /// <param name="remainingRetries">Оставшееся количество повторных попыток.</param>
-    /// <param name="utcNow">Текущее время.</param>
-    public void MarkFailed(int remainingRetries, DateTime utcNow)
+    /// <param name="utcNow">Время падения.</param>
+    /// <param name="errorDetails">Детали ошибки (опционально, для логирования).</param>
+    public void MarkFailed(DateTime utcNow, string? errorDetails = null)
     {
         if (Status != TaskStatus.Executing)
             throw new InvalidOperationException($"Cannot fail task in status {Status}");
-        
-        if (remainingRetries <= 0)
+
+        CurrentAttempt++; // Инкремент попыток внутри агрегата
+
+        if (CurrentAttempt >= RetryPolicy.MaxAttempts)
         {
             Status = TaskStatus.Dead;
             _domainEvents.Add(new TaskMovedToDlqEvent(Id));
@@ -159,8 +164,9 @@ public sealed class ScheduledTask
             Status = TaskStatus.Failed;
             _domainEvents.Add(new TaskFailedEvent(Id));
         }
+
         UpdatedAt = utcNow;
-        LockedUntil = null; // разблокируем, чтобы мог быть подобран планировщиком
+        LockedUntil = null;
     }
 
     /// <summary>
