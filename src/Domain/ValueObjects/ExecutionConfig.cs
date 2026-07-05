@@ -2,13 +2,21 @@ using System.Collections.Generic;
 
 namespace  Domain.ValueObjects;
 
-public sealed class ExecutionConfig
+/// <summary>
+/// Конфигурация HTTP-запроса для выполнения задания.
+/// Неизменяемый, сравнивается по значению всех полей.
+/// </summary>
+public sealed record ExecutionConfig
 {
-    public string Method { get; } // GET, POST, PUT, PATCH, DELETE
-    public string Url { get; }
-    public IReadOnlyDictionary<string, string> Headers { get; }
-    public string? Body { get; } // JSON string
+    public string Method { get; init; }
+    public string Url { get; init; }
+    public IReadOnlyDictionary<string, string> Headers { get; init; }
+    public string? Body { get; init; }
 
+    /// <summary>
+    /// Конструктор для создания конфига.
+    /// Все поля обязательны, кроме Body.
+    /// </summary>
     public ExecutionConfig(string method, string url,
         IReadOnlyDictionary<string, string>? headers = null, string? body = null)
     {

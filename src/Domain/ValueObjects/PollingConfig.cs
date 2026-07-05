@@ -1,12 +1,17 @@
+using System;
+
 namespace  Domain.ValueObjects;
 
-public sealed class PollingConfig
+/// <summary>
+/// Конфигурация для polling-заданий. Неизменяемый тип, сравнивается по значению.
+/// </summary>
+public sealed record PollingConfig
 {
-    public string Field { get; }
-    public string? Condition { get; } // "changed", "greater_than", "not_equal", etc.
-    public string? Value { get; }
-    public int IntervalSeconds { get; }
-    public bool VerboseLogging { get; }
+    public string Field { get; init; }
+    public string? Condition { get; init; }
+    public string? Value { get; init; }
+    public int IntervalSeconds { get; init; }
+    public bool VerboseLogging { get; init; }
 
     public PollingConfig(string field, string? condition, string? value, int intervalSeconds = 60, bool verboseLogging = false)
     {

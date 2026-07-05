@@ -1,8 +1,12 @@
 using System;
-using  Domain.ValueObjects;
+using Domain.ValueObjects;
 
-namespace  Domain.Entities;
+namespace Domain.Entities;
 
+/// <summary>
+/// Состояние polling-задания: хранит последний ответ от внешнего сервиса
+/// и время последней проверки. Нужно для сравнения "изменилось/не изменилось".
+/// </summary>
 public sealed class PollingState
 {
     public TaskId TaskId { get; private set; }
@@ -14,9 +18,14 @@ public sealed class PollingState
         TaskId = taskId;
     }
 
-    public void UpdateState(string? responseJson)
+    /// <summary>
+    /// Обновляет состояние после проверки polling-задания.
+    /// </summary>
+    /// <param name="responseJson">Тело ответа (сохраняется для будущих сравнений).</param>
+    /// <param name="utcNow">Время проверки.</param>
+    public void UpdateState(string? responseJson, DateTime utcNow)
     {
         LastResponseJson = responseJson;
-        LastCheckedAt = DateTime.UtcNow;
+        LastCheckedAt = utcNow;
     }
 }

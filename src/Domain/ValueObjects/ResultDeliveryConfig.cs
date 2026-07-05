@@ -1,13 +1,34 @@
-using  Domain.Enums;
+using Domain.Enums;
 
-namespace  Domain.ValueObjects;
+namespace Domain.ValueObjects;
 
-public sealed class ResultDeliveryConfig
+/// <summary>
+/// Конфигурация доставки результата выполнения задания.
+/// Определяет, куда и как отправить результат после успешного выполнения.
+/// Неизменяемый, сравнивается по значению.
+/// </summary>
+public sealed record ResultDeliveryConfig
 {
-    public ResultDeliveryMode Mode { get; }
-    public string Url { get; }
-    public string Method { get; }
-    public string? Params { get; } // JSON for FixedCall
+    /// <summary>
+    /// Режим доставки: переслать ответ как есть (ForwardResponse) 
+    /// или выполнить фиксированный вызов с параметрами (FixedCall).
+    /// </summary>
+    public ResultDeliveryMode Mode { get; init; }
+
+    /// <summary>
+    /// URL, на который доставляется результат.
+    /// </summary>
+    public string Url { get; init; }
+
+    /// <summary>
+    /// HTTP-метод для доставки (POST, PUT и т.д.).
+    /// </summary>
+    public string Method { get; init; }
+
+    /// <summary>
+    /// Параметры запроса в формате JSON. Используется только для режима FixedCall.
+    /// </summary>
+    public string? Params { get; init; }
 
     public ResultDeliveryConfig(ResultDeliveryMode mode, string url, string method, string? @params = null)
     {
