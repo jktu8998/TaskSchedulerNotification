@@ -50,6 +50,36 @@ public sealed record Schedule
     public bool IsAbsolute => ExecuteAt.HasValue;
     public bool IsOffset => Offset.HasValue;
     public bool IsCron => !string.IsNullOrWhiteSpace(CronExpression);
+    
+    /// <summary>
+    /// Вычисляет абсолютное время следующего выполнения на основе базового времени.
+    /// Для Absolute возвращает само ExecuteAt.
+    /// Для Offset прибавляет смещение к baseTime.
+    /// Для Cron находит ближайшее вхождение после baseTime (или в момент baseTime, если совпадает).
+    /// Если cron не имеет будущих вхождений, возвращает null.
+    /// </summary>
+    /// <param name="baseTime">Базовое время в UTC.</param>
+    /// <returns>Следующее время выполнения или null.</returns>
+    public DateTime? GetNextOccurrence(DateTime baseTime)
+    {
+        if (IsAbsolute)
+            return ExecuteAt!.Value.UtcDateTime;
+
+        if (IsOffset)
+            return baseTime + Offset!.Value;
+
+        if (IsCron)
+        {
+            // Явно указываем неймспейс Cronos, чтобы избежать конфликта с именем свойства CronExpression
+            var cron = Cronos.CronExpression.Parse(this.CronExpression, Cronos.CronFormat.IncludeSeconds);
+            var timeZone = Timezone != null
+                ? TimeZoneInfo.FindSystemTimeZoneById(Timezone)
+                : TimeZoneInfo.Utc;
+            return cron.GetNextOccurrence(baseTime, timeZone, true);
+        }
+
+        throw new InvalidOperationException("Schedule has no valid specification.");
+    }
 
     public override string ToString() =>
         IsAbsolute ? $"At {ExecuteAt:O}" :

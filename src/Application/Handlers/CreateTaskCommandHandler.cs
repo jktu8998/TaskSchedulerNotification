@@ -107,8 +107,8 @@ using System;
                utcNow);
    
            // Вычисляем время следующего выполнения
-           var nextExecutionAt = CalculateNextExecution(task.Schedule, task.CreatedAt, utcNow);
-           // 8. Переход Created -> Scheduled
+           var nextExecutionAt = task.Schedule.GetNextOccurrence(task.CreatedAt)
+                                 ?? throw new InvalidOperationException("Cron expression has no future occurrences.");           // 8. Переход Created -> Scheduled
            task.ScheduleTask(utcNow, nextExecutionAt);
    
            // 9. Сохранение в транзакции и диспетчеризация событий
@@ -129,7 +129,7 @@ using System;
            return task.Id.Value;
        }
        
-       private static DateTime CalculateNextExecution(Schedule schedule, DateTime createdAt, DateTime utcNow)
+       /*private static DateTime CalculateNextExecution(Schedule schedule, DateTime createdAt, DateTime utcNow)
        {
            if (schedule.IsAbsolute)
                return schedule.ExecuteAt!.Value.UtcDateTime;
@@ -149,7 +149,7 @@ using System;
            }
 
            throw new InvalidOperationException("Schedule has no valid time specification.");
-       }
+       }*/
    
        private static Schedule MapSchedule(ScheduleDto dto)
        {

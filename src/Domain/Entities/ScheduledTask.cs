@@ -238,6 +238,25 @@ public sealed class ScheduledTask
         // Просто переиспользуем TaskScheduledEvent, если нужно логирование.
         _domainEvents.Add(new TaskScheduledEvent(Id));
     }
+    
+    /// <summary>
+    /// Переводит задание из Failed в Scheduled для повторной попытки.
+    /// Вызывается после неудачного выполнения, если CurrentAttempt < MaxAttempts.
+    /// </summary>
+    /// <param name="utcNow">Текущее время.</param>
+    /// <param name="nextExecutionAt">Абсолютное время следующей попытки (utcNow + интервал из RetryPolicy).</param>
+    public void ScheduleRetry(DateTime utcNow, DateTime nextExecutionAt)
+    {
+        if (Status != TaskStatus.Failed)
+            throw new InvalidOperationException($"Cannot schedule retry in status {Status}");
+
+        Status = TaskStatus.Scheduled;
+        NextExecutionAt = nextExecutionAt;
+        UpdatedAt = utcNow;
+        LockedUntil = null; // разблокируем задачу, она больше не в Executing
+
+        _domainEvents.Add(new TaskScheduledEvent(Id));
+    }
 
     /// <summary>
     /// Очищает накопленные доменные события (вызывается после их диспетчеризации).

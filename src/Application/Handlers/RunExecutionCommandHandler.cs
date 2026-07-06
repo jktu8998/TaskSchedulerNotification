@@ -1,0 +1,197 @@
+using System;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+using Application.Commands;
+using Application.Interfaces;
+using Domain.Entities;
+using Domain.Enums;
+using Domain.Interfaces;
+using Domain.ValueObjects;
+using TaskStatus = Domain.Enums.TaskStatus;
+
+namespace Application.Handlers;
+
+public sealed class RunExecutionCommandHandler : ICommandHandler<RunExecutionCommand>
+{
+    private readonly ITaskRepository _taskRepo;
+    private readonly IHttpExecutor _httpExecutor;
+    private readonly IUnitOfWork _unitOfWork;
+    private readonly IDateTimeProvider _dateTime;
+    private readonly IDomainEventDispatcher _dispatcher;
+    private readonly IDeadLetterRepository _dlqRepo;
+
+    public RunExecutionCommandHandler(
+        ITaskRepository taskRepo,
+        IHttpExecutor httpExecutor,
+        IUnitOfWork unitOfWork,
+        IDateTimeProvider dateTime,
+        IDomainEventDispatcher dispatcher,
+        IDeadLetterRepository dlqRepo)
+    {
+        _taskRepo = taskRepo;
+        _httpExecutor = httpExecutor;
+        _unitOfWork = unitOfWork;
+        _dateTime = dateTime;
+        _dispatcher = dispatcher;
+        _dlqRepo = dlqRepo;
+    }
+
+    public async Task HandleAsync(RunExecutionCommand command, CancellationToken cancellationToken = default)
+    {
+        var utcNow = _dateTime.UtcNow;
+        var taskId = TaskId.From(command.TaskId);
+        
+        // Загружаем задание
+        var task = await _taskRepo.GetByIdAsync(taskId, cancellationToken);
+        if (task == null || task.Status != TaskStatus.Queued)
+            return; // игнорируем дубликаты или неактуальные сообщения
+
+        // ====== ФАЗА 1: Захват (быстрая транзакция) ======
+        await _unitOfWork.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            task.StartExecution(utcNow, TimeSpan.FromSeconds(30)); // lockDuration = 30 сек
+            await _taskRepo.UpdateAsync(task, cancellationToken);
+            await _dispatcher.DispatchAsync(task.DomainEvents, cancellationToken);
+            await _unitOfWork.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            task.ClearDomainEvents();
+            throw; // при ошибке захвата — пробрасываем выше, чтобы воркер мог решить, что делать
+        }
+        task.ClearDomainEvents();
+
+        // ====== ФАЗА 2: Выполнение HTTP-запроса (без транзакции) ======
+        var executionConfig = task.Execution;
+        var request = new HttpRequestConfig(
+            executionConfig.Method,
+            executionConfig.Url,
+            executionConfig.Headers,
+            executionConfig.Body);
+
+        HttpResponseResult response;
+        try
+        {
+            response = await _httpExecutor.ExecuteAsync(request, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            // Ошибка самого HTTP-запроса (сеть, таймаут)
+            response = new HttpResponseResult(0, ex.Message, false);
+        }
+
+        // ====== ФАЗА 3: Фиксация результата (новая быстрая транзакция) ======
+        // Перезагружаем задание, чтобы иметь актуальное состояние (хотя LockedUntil не истёк, но для надёжности)
+        task = await _taskRepo.GetByIdAsync(taskId, cancellationToken);
+        if (task == null || task.Status != TaskStatus.Executing)
+        {
+            // Задание кто-то перехватил (heartbeat) или отменил — игнорируем
+            return;
+        }
+
+        await _unitOfWork.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            if (response.IsSuccess)
+            {
+                // Успешное выполнение
+                if (task.Type == TaskType.Periodic)
+                {
+                    var nextExecutionAt = task.Schedule.GetNextOccurrence(utcNow)
+                                          ?? throw new InvalidOperationException("Cron expression has no future occurrences.");
+                    task.Reschedule(utcNow, nextExecutionAt);
+                }
+                else
+                {
+                    task.CompleteSuccessfully(utcNow);
+                }
+            }
+            else
+            {
+                // Неудача
+                task.MarkFailed(utcNow, response.Body ?? "Unknown error");
+
+                if (task.Status == TaskStatus.Failed)
+                {
+                    // Планируем повторную попытку
+                    var retryInterval = TimeSpan.FromSeconds(
+                        task.RetryPolicy.IntervalsSeconds[task.CurrentAttempt - 1]);
+                    var nextRetryAt = utcNow + retryInterval;
+                    task.ScheduleRetry(utcNow, nextRetryAt);
+                }
+                else if (task.Status == TaskStatus.Dead)
+                {
+                    // Попытки исчерпаны — сохраняем в DLQ
+                    var snapshot = JsonSerializer.Serialize(task);
+                    var dlqEntry = new DeadLetterEntry(task.Id, snapshot, response.Body ?? "Unknown error", utcNow);
+                    await _dlqRepo.AddAsync(dlqEntry, cancellationToken);
+                }
+            }
+
+            await _taskRepo.UpdateAsync(task, cancellationToken);
+            await _dispatcher.DispatchAsync(task.DomainEvents, cancellationToken);
+            await _unitOfWork.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            task.ClearDomainEvents();
+            throw;
+        }
+        task.ClearDomainEvents();
+
+        // ====== Доставка результата (вне транзакции, только при успехе) ======
+        if (response.IsSuccess && task.ResultDelivery != null)
+        {
+            // Доставка результата — не критично для задания, ошибки просто логируем
+            try
+            {
+                var deliveryConfig = task.ResultDelivery;
+                HttpRequestConfig deliveryRequest;
+                if (deliveryConfig.Mode == ResultDeliveryMode.ForwardResponse)
+                {
+                    deliveryRequest = new HttpRequestConfig(
+                        deliveryConfig.Method,
+                        deliveryConfig.Url,
+                        null,
+                        response.Body);
+                }
+                else // FixedCall
+                {
+                    deliveryRequest = new HttpRequestConfig(
+                        deliveryConfig.Method,
+                        deliveryConfig.Url,
+                        null,
+                        deliveryConfig.Params);
+                }
+
+                await _httpExecutor.ExecuteAsync(deliveryRequest, cancellationToken);
+            }
+            catch
+            {
+                // TODO: залогировать ошибку доставки, но не откатывать задание
+            }
+        }
+    }
+
+    /*private static DateTime CalculateNextExecution(Schedule schedule, DateTime createdAt, DateTime utcNow)
+    {
+        // Аналогично расчету в CreateTaskCommandHandler
+        if (schedule.IsAbsolute)
+            return schedule.ExecuteAt!.Value.UtcDateTime;
+        if (schedule.IsOffset)
+            return createdAt + schedule.Offset!.Value;
+        if (schedule.IsCron)
+        {
+            var cronExpression = Cronos.CronExpression.Parse(schedule.CronExpression, Cronos.CronFormat.IncludeSeconds);
+            var next = cronExpression.GetNextOccurrence(createdAt, TimeZoneInfo.Utc, true);
+            if (next == null)
+                throw new InvalidOperationException("Cron expression has no future occurrences.");
+            return next.Value;
+        }
+        throw new InvalidOperationException("Schedule has no valid time specification.");
+    }*/
+}
