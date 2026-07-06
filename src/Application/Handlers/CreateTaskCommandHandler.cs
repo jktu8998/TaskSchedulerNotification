@@ -2,6 +2,7 @@ using System;
    using System.Collections.Generic;
    using System.Threading;
    using System.Threading.Tasks;
+   using Cronos;
    using Application.Commands;
    using Application.Dto;
    using Application.Interfaces;
@@ -105,8 +106,10 @@ using System;
                encrypted,
                utcNow);
    
+           // Вычисляем время следующего выполнения
+           var nextExecutionAt = CalculateNextExecution(task.Schedule, task.CreatedAt, utcNow);
            // 8. Переход Created -> Scheduled
-           task.ScheduleTask(utcNow);
+           task.ScheduleTask(utcNow, nextExecutionAt);
    
            // 9. Сохранение в транзакции и диспетчеризация событий
            await _unitOfWork.BeginTransactionAsync(cancellationToken);
@@ -124,6 +127,28 @@ using System;
    
            task.ClearDomainEvents();
            return task.Id.Value;
+       }
+       
+       private static DateTime CalculateNextExecution(Schedule schedule, DateTime createdAt, DateTime utcNow)
+       {
+           if (schedule.IsAbsolute)
+               return schedule.ExecuteAt!.Value.UtcDateTime;
+        
+           if (schedule.IsOffset)
+               return createdAt + schedule.Offset!.Value;
+        
+           if (schedule.IsCron)
+           {
+               var cronExpression = CronExpression.Parse(schedule.CronExpression, CronFormat.IncludeSeconds);
+               // Для cron вычисляем следующее вхождение после utcNow (или createdAt? по логике — после создания)
+               // Используем created как базовое время, чтобы не пропустить первое вхождение
+               var next = cronExpression.GetNextOccurrence(createdAt, TimeZoneInfo.Utc, true);
+               if (next == null)
+                   throw new InvalidOperationException("Cron expression has no future occurrences.");
+               return next.Value;
+           }
+
+           throw new InvalidOperationException("Schedule has no valid time specification.");
        }
    
        private static Schedule MapSchedule(ScheduleDto dto)

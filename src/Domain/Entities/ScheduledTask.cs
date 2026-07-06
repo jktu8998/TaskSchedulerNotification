@@ -26,6 +26,12 @@ public sealed class ScheduledTask
     public string? EncryptedSensitiveData { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime? UpdatedAt { get; private set; }
+    /// <summary>
+    /// Вычисленное абсолютное время следующего выполнения (UTC).
+    /// Используется планировщиком для поиска заданий, готовых к выполнению.
+    /// null, если задание не в статусе Scheduled.
+    /// </summary>
+    public DateTime? NextExecutionAt { get; private set; }
 
     /// <summary>
     /// Время, до которого задача заблокирована воркером (статус Executing).
@@ -82,23 +88,29 @@ public sealed class ScheduledTask
         UpdatedAt = utcNow;
         LockedUntil = null;
         CurrentAttempt = 0;
+        NextExecutionAt = null; // будет установлено при планировании
         _domainEvents.Add(new TaskCreatedEvent(this));
     }
 
     // ========== Методы переходов статусов ==========
 
     /// <summary>
-    /// Переводит задание из Created в Scheduled.
+    /// Планирует задание: переводит из Created в Scheduled и фиксирует 
+    /// абсолютное время следующего выполнения.
     /// </summary>
-    public void ScheduleTask(DateTime utcNow)
+    /// <param name="utcNow">Текущее время.</param>
+    /// <param name="nextExecutionAt">Абсолютное время ближайшего запуска.</param>
+    public void ScheduleTask(DateTime utcNow, DateTime nextExecutionAt)
     {
         if (Status != TaskStatus.Created)
             throw new InvalidOperationException($"Cannot schedule task in status {Status}");
+    
         Status = TaskStatus.Scheduled;
+        NextExecutionAt = nextExecutionAt;
         UpdatedAt = utcNow;
         _domainEvents.Add(new TaskScheduledEvent(Id));
     }
-
+    
     /// <summary>
     /// Переводит задание из Scheduled в Queued.
     /// </summary>
@@ -205,6 +217,26 @@ public sealed class ScheduledTask
         UpdatedAt = utcNow;
         LockedUntil = null;
         _domainEvents.Add(new TaskCancelledEvent(Id));
+    }
+    
+    /// <summary>
+    /// Перепланирует периодическое задание после выполнения.
+    /// Переводит из Executing обратно в Scheduled и обновляет время следующего запуска.
+    /// </summary>
+    /// <param name="utcNow">Текущее время.</param>
+    /// <param name="nextExecutionAt">Абсолютное время следующего запуска.</param>
+    public void Reschedule(DateTime utcNow, DateTime nextExecutionAt)
+    {
+        if (Status != TaskStatus.Executing)
+            throw new InvalidOperationException($"Cannot reschedule task in status {Status}");
+    
+        Status = TaskStatus.Scheduled;
+        NextExecutionAt = nextExecutionAt;
+        UpdatedAt = utcNow;
+        LockedUntil = null;
+        // Здесь можно добавить событие TaskRescheduledEvent, но пока KISS — не будем плодить события.
+        // Просто переиспользуем TaskScheduledEvent, если нужно логирование.
+        _domainEvents.Add(new TaskScheduledEvent(Id));
     }
 
     /// <summary>
