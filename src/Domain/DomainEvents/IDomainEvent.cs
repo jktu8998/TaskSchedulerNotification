@@ -1,3 +1,5 @@
+using Domain.ValueObjects;
+
 namespace Domain.DomainEvents;
 
 /// <summary>
@@ -6,4 +8,6 @@ namespace Domain.DomainEvents;
 /// </summary>
 public interface IDomainEvent
 {
+    /// <summary>Идентификатор задания, с которым связано событие.</summary>
+    TaskId TaskId { get; }
 }
