@@ -11,11 +11,11 @@ namespace Domain.Interfaces;
 public interface IPollingStateRepository
 {
     /// <summary>Получить состояние polling-задания по его идентификатору.</summary>
-    Task<PollingState?> GetByTaskIdAsync(TaskId taskId);
+    Task<PollingState?> GetByTaskIdAsync(TaskId taskId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Создать или обновить состояние polling-задания.
     /// Если записи ещё нет — создаёт, если есть — обновляет LastResponseJson и LastCheckedAt.
     /// </summary>
-    Task UpsertAsync(PollingState state);
+    Task UpsertAsync(PollingState state, CancellationToken cancellationToken = default);
 }

@@ -11,14 +11,14 @@ namespace Domain.Interfaces;
 public interface IDeadLetterRepository
 {
     /// <summary>Добавить задание в DLQ.</summary>
-    Task AddAsync(DeadLetterEntry entry);
+    Task AddAsync(DeadLetterEntry entry, CancellationToken cancellationToken = default);
 
     /// <summary>Получить запись DLQ по идентификатору записи.</summary>
-    Task<DeadLetterEntry?> GetByIdAsync(long id);
+    Task<DeadLetterEntry?> GetByIdAsync(long id, CancellationToken cancellationToken = default);
 
     /// <summary>Получить все записи DLQ с пагинацией.</summary>
-    Task<IReadOnlyList<DeadLetterEntry>> GetAllAsync(int skip, int take);
+    Task<IReadOnlyList<DeadLetterEntry>> GetAllAsync(int skip, int take, CancellationToken cancellationToken = default);
 
     /// <summary>Удалить запись из DLQ (например, после ручного перезапуска).</summary>
-    Task RemoveAsync(long id);
+    Task RemoveAsync(long id, CancellationToken cancellationToken = default);
 }

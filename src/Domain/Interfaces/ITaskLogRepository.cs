@@ -12,11 +12,11 @@ namespace Domain.Interfaces;
 public interface ITaskLogRepository
 {
     /// <summary>Добавить новую запись в лог.</summary>
-    Task AddAsync(TaskLog log);
+    Task AddAsync(TaskLog log, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Получить все логи по идентификатору задания.
     /// Возвращает записи в хронологическом порядке.
     /// </summary>
-    Task<IReadOnlyList<TaskLog>> GetByTaskIdAsync(TaskId taskId);
+    Task<IReadOnlyList<TaskLog>> GetByTaskIdAsync(TaskId taskId, CancellationToken cancellationToken = default);
 }
