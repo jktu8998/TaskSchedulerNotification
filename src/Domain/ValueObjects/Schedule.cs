@@ -70,11 +70,20 @@ public sealed record Schedule
 
         if (IsCron)
         {
-            // Явно указываем неймспейс Cronos, чтобы избежать конфликта с именем свойства CronExpression
             var cron = Cronos.CronExpression.Parse(this.CronExpression, Cronos.CronFormat.IncludeSeconds);
-            var timeZone = Timezone != null
-                ? TimeZoneInfo.FindSystemTimeZoneById(Timezone)
-                : TimeZoneInfo.Utc;
+        
+            // Безопасное получение таймзоны с фоллбеком на UTC
+            TimeZoneInfo timeZone = TimeZoneInfo.Utc;
+            if (!string.IsNullOrWhiteSpace(Timezone))
+            {
+                if (!TimeZoneInfo.TryFindSystemTimeZoneById(Timezone, out timeZone))
+                {
+                    // Если таймзона не найдена, оставляем UTC (продакшен не упадёт)
+                    // TODO: залогировать предупреждение через доменное событие или ILogger (но не здесь)
+                    timeZone = TimeZoneInfo.Utc;
+                }
+            }
+        
             return cron.GetNextOccurrence(baseTime, timeZone, true);
         }
 
