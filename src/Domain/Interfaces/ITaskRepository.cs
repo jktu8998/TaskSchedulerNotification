@@ -45,6 +45,10 @@ public interface ITaskRepository
     Task UpdateAsync(ScheduledTask task, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Возвращает список заданий в статусе Executing, у которых LockedUntil <= utcNow.
+    /// </summary>
+    Task<IReadOnlyList<ScheduledTask>> GetStaleExecutingTasksAsync(DateTime utcNow, CancellationToken ct);
+    /// <summary>
     /// Атомарно захватить следующее задание из очереди (статус Queued).
     /// Гарантирует, что одно задание не попадёт двум воркерам одновременно.
     /// Реализуется через SELECT FOR UPDATE SKIP LOCKED.

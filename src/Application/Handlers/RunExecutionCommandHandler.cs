@@ -132,8 +132,11 @@ public sealed class RunExecutionCommandHandler : ICommandHandler<RunExecutionCom
                 if (task.Status == TaskStatus.Failed)
                 {
                     // Планируем повторную попытку
-                    var retryInterval = TimeSpan.FromSeconds(
-                        task.RetryPolicy.IntervalsSeconds[task.CurrentAttempt - 1]);
+                    var attemptIndex = task.CurrentAttempt - 1;
+                    // Защита от выхода за границы при аномалиях данных или гонках
+                    var retryInterval = attemptIndex >= 0 && attemptIndex < task.RetryPolicy.IntervalsSeconds.Count
+                        ? TimeSpan.FromSeconds(task.RetryPolicy.IntervalsSeconds[attemptIndex])
+                        : TimeSpan.FromMinutes(1); // Безопасный фолбек
                     var nextRetryAt = utcNow + retryInterval;
                     task.ScheduleRetry(utcNow, nextRetryAt);
                 }
