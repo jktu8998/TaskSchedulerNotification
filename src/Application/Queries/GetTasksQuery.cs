@@ -5,6 +5,8 @@ namespace Application.Queries;
 
 /// <summary>
 /// Запрос на получение списка заданий с фильтрацией и пагинацией.
+/// Фильтры опциональны: статус и тип задания.
+/// Результаты автоматически ограничиваются текущим отправителем.
 /// </summary>
 public sealed record GetTasksQuery(
     string SenderId,

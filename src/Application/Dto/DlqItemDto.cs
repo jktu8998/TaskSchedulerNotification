@@ -12,6 +12,11 @@ public sealed record DlqItemDto
 
     /// <summary>Идентификатор оригинального задания.</summary>
     public Guid TaskId { get; init; }
+    
+    /// <summary>
+    /// Id сервиса который кидает задачу 
+    /// </summary>
+    public string SenderId { get; init; }
 
     /// <summary>Полный снимок оригинального задания в JSON (Schedule, Execution и т.д.).</summary>
     public string OriginalTaskSnapshot { get; init; }

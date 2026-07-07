@@ -16,8 +16,11 @@ public interface IDeadLetterRepository
     /// <summary>Получить запись DLQ по идентификатору записи.</summary>
     Task<DeadLetterEntry?> GetByIdAsync(long id, CancellationToken cancellationToken = default);
 
-    /// <summary>Получить все записи DLQ с пагинацией.</summary>
-    Task<IReadOnlyList<DeadLetterEntry>> GetAllAsync(int skip, int take, CancellationToken cancellationToken = default);
+    /// <summary>Получить все записи DLQ с пагинацией.</summary> // Для конкретного сервиса
+    Task<IReadOnlyList<DeadLetterEntry>> GetBySenderIdAsync(string senderId, int skip, int take, CancellationToken cancellationToken = default);
+    
+    // Для админа
+    Task<IReadOnlyList<DeadLetterEntry>> GetAllAsync(int skip, int take, CancellationToken ct);
 
     /// <summary>Удалить запись из DLQ (например, после ручного перезапуска).</summary>
     Task RemoveAsync(long id, CancellationToken cancellationToken = default);

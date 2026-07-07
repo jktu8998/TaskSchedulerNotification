@@ -141,7 +141,7 @@ public sealed class RunExecutionCommandHandler : ICommandHandler<RunExecutionCom
                 {
                     // Попытки исчерпаны — сохраняем в DLQ
                     var snapshot = JsonSerializer.Serialize(task);
-                    var dlqEntry = new DeadLetterEntry(task.Id, snapshot, response.Body ?? "Unknown error", utcNow);
+                    var dlqEntry = new DeadLetterEntry(task.Id, task.SenderId, snapshot, response.Body ?? "Unknown error", utcNow);
                     await _dlqRepo.AddAsync(dlqEntry, cancellationToken);
                 }
             }

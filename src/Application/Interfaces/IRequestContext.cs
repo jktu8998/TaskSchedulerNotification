@@ -7,4 +7,5 @@ namespace Application.Interfaces;
 public interface IRequestContext
 {
     string SenderId { get; }
+    bool IsAdmin { get; }
 }
