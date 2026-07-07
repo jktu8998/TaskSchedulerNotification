@@ -11,7 +11,22 @@ using Domain.ValueObjects;
 using TaskStatus = Domain.Enums.TaskStatus;
 
 namespace Application.Handlers;
-
+/// <summary>
+/// Обработчик команды выполнения задания.
+/// Реализует трёхфазный алгоритм:
+/// 1. Захват (короткая транзакция): переводит задание из Queued в Executing,
+///    устанавливает LockedUntil и сразу коммитит, освобождая соединение с БД.
+/// 2. Выполнение (без транзакции): совершает HTTP-запрос к внешнему сервису.
+/// 3. Фиксация результата (новая короткая транзакция): в зависимости от ответа
+///    либо завершает задание успешно (CompleteSuccessfully), либо помечает как
+///    проваленное (MarkFailed). Для периодических задач после успеха вызывает
+///    Reschedule с новым временем срабатывания. При исчерпании попыток
+///    сохраняет снимок задания в Dead Letter Queue.
+/// 
+/// Гарантирует идемпотентность (игнорирует задачи не в статусе Queued),
+/// изолирует транзакции от длительного I/O, а доставку результата
+/// (ResultDelivery) выполняет вне транзакции после успешного коммита.
+/// </summary>
 public sealed class RunExecutionCommandHandler : ICommandHandler<RunExecutionCommand>
 {
     private readonly ITaskRepository _taskRepo;
