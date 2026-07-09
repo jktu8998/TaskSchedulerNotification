@@ -12,17 +12,22 @@ public sealed record ExecutionConfig
     public string Url { get; init; }
     public IReadOnlyDictionary<string, string> Headers { get; init; }
     public string? Body { get; init; }
+    /// <summary>
+    /// Таймаут HTTP-запроса в секундах. Если null, используется значение по умолчанию (30 секунд).
+    /// </summary>
+    public int? TimeoutSeconds { get; init; }
 
     /// <summary>
     /// Конструктор для создания конфига.
-    /// Все поля обязательны, кроме Body.
+    /// Все поля обязательны, кроме Body и TimeoutSeconds.
     /// </summary>
     public ExecutionConfig(string method, string url,
-        IReadOnlyDictionary<string, string>? headers = null, string? body = null)
+        IReadOnlyDictionary<string, string>? headers = null, string? body = null, int? timeoutSeconds = null)
     {
         Method = method.ToUpperInvariant();
         Url = url;
         Headers = headers ?? new Dictionary<string, string>();
         Body = body;
+        TimeoutSeconds = timeoutSeconds;
     }
 }

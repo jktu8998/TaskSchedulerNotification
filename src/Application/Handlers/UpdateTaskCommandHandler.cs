@@ -59,8 +59,11 @@ public sealed class UpdateTaskCommandHandler : ICommandHandler<UpdateTaskCommand
         // 2. Создаём новое задание на основе DTO
         var req = command.UpdatedFields;
         var schedule =ScheduleMapper.MapSchedule(req.Schedule);
-        var execution = new ExecutionConfig(req.Execution.Method, req.Execution.Url,
-            req.Execution.Headers, req.Execution.Body);
+        var execution = new ExecutionConfig(req.Execution.Method,
+                                            req.Execution.Url,
+                                            req.Execution.Headers, 
+                                            req.Execution.Body,
+                                            req.Execution.TimeoutSeconds);
 
         ResultDeliveryConfig? resultDelivery = null;
         if (req.ResultDelivery != null)

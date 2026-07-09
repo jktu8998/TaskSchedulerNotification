@@ -15,6 +15,7 @@ namespace Application.Handlers;
 /// Обработчик восстановления зависших заданий.
 /// Находит задания в статусе Executing с истекшим LockedUntil.
 /// Помечает их как Failed (или Dead) и перепланирует/отправляет в DLQ.
+/// Добавлен Jitter к интервалам повторов, чтобы избежать эффекта "гремящего стада".
 /// </summary>
 public sealed class RunHeartbeatCommandHandler : ICommandHandler<RunHeartbeatCommand>
 {
@@ -23,19 +24,22 @@ public sealed class RunHeartbeatCommandHandler : ICommandHandler<RunHeartbeatCom
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDateTimeProvider _dateTime;
     private readonly IDomainEventDispatcher _dispatcher;
+    private readonly IRandomProvider _random;
 
     public RunHeartbeatCommandHandler(
         ITaskRepository taskRepo,
         IDeadLetterRepository dlqRepo,
         IUnitOfWork unitOfWork,
         IDateTimeProvider dateTime,
-        IDomainEventDispatcher dispatcher)
+        IDomainEventDispatcher dispatcher,
+        IRandomProvider random)
     {
         _taskRepo = taskRepo;
         _dlqRepo = dlqRepo;
         _unitOfWork = unitOfWork;
         _dateTime = dateTime;
         _dispatcher = dispatcher;
+        _random = random;
     }
 
     public async Task HandleAsync(RunHeartbeatCommand command, CancellationToken cancellationToken = default)
@@ -60,10 +64,13 @@ public sealed class RunHeartbeatCommandHandler : ICommandHandler<RunHeartbeatCom
                 {
                     // Вычисляем время следующей попытки и переводим в Scheduled
                     var attemptIndex = task.CurrentAttempt - 1;
-                    var retryInterval = attemptIndex < task.RetryPolicy.IntervalsSeconds.Count
+                    var baseInterval = attemptIndex < task.RetryPolicy.IntervalsSeconds.Count
                         ? TimeSpan.FromSeconds(task.RetryPolicy.IntervalsSeconds[attemptIndex])
                         : TimeSpan.FromMinutes(1);
-                    var nextRetryAt = utcNow + retryInterval;
+                    // Добавляем случайный разброс (Jitter) 0–15 секунд
+                    var jitter = TimeSpan.FromSeconds(_random.Next(0, 16));
+                    var jitteredInterval = baseInterval + jitter;
+                    var nextRetryAt = utcNow + jitteredInterval;
                     task.ScheduleRetry(utcNow, nextRetryAt);
                 }
                 else if (task.Status == TaskStatus.Dead)

@@ -10,7 +10,13 @@ public sealed record HttpRequestConfig(
     string Method,
     string Url,
     IReadOnlyDictionary<string, string>? Headers,
-    string? Body);
+    string? Body)
+{
+    /// <summary>
+    /// Таймаут выполнения запроса. Если null, используется значение по умолчанию.
+    /// </summary>
+    public TimeSpan? Timeout { get; init; }
+}
 
 /// <summary>
 /// Результат выполнения HTTP-запроса.

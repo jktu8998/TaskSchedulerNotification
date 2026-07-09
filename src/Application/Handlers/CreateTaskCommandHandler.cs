@@ -56,7 +56,8 @@ using System;
                req.Execution.Method,
                req.Execution.Url,
                req.Execution.Headers,
-               req.Execution.Body);
+               req.Execution.Body,
+               req.Execution.TimeoutSeconds);
    
            // 3. Маппинг ResultDeliveryConfig (опционально)
            ResultDeliveryConfig? resultDelivery = null;

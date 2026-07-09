@@ -11,12 +11,13 @@ using Domain.ValueObjects;
 using TaskStatus = Domain.Enums.TaskStatus;
 
 namespace Application.Handlers;
+
 /// <summary>
 /// Обработчик команды выполнения задания.
 /// Реализует трёхфазный алгоритм:
 /// 1. Захват (короткая транзакция): переводит задание из Queued в Executing,
 ///    устанавливает LockedUntil и сразу коммитит, освобождая соединение с БД.
-/// 2. Выполнение (без транзакции): совершает HTTP-запрос к внешнему сервису.
+/// 2. Выполнение (без транзакции): совершает HTTP-запрос к внешнему сервису с указанным таймаутом.
 /// 3. Фиксация результата (новая короткая транзакция): в зависимости от ответа
 ///    либо завершает задание успешно (CompleteSuccessfully), либо помечает как
 ///    проваленное (MarkFailed). Для периодических задач после успеха вызывает
@@ -35,14 +36,16 @@ public sealed class RunExecutionCommandHandler : ICommandHandler<RunExecutionCom
     private readonly IDateTimeProvider _dateTime;
     private readonly IDomainEventDispatcher _dispatcher;
     private readonly IDeadLetterRepository _dlqRepo;
-
+    private readonly IRandomProvider _random;    
+    
     public RunExecutionCommandHandler(
         ITaskRepository taskRepo,
         IHttpExecutor httpExecutor,
         IUnitOfWork unitOfWork,
         IDateTimeProvider dateTime,
         IDomainEventDispatcher dispatcher,
-        IDeadLetterRepository dlqRepo)
+        IDeadLetterRepository dlqRepo,
+        IRandomProvider random)
     {
         _taskRepo = taskRepo;
         _httpExecutor = httpExecutor;
@@ -50,23 +53,28 @@ public sealed class RunExecutionCommandHandler : ICommandHandler<RunExecutionCom
         _dateTime = dateTime;
         _dispatcher = dispatcher;
         _dlqRepo = dlqRepo;
+        _random = random;
     }
 
     public async Task HandleAsync(RunExecutionCommand command, CancellationToken cancellationToken = default)
     {
         var utcNow = _dateTime.UtcNow;
         var taskId = TaskId.From(command.TaskId);
-        
+
         // Загружаем задание
         var task = await _taskRepo.GetByIdAsync(taskId, cancellationToken);
         if (task == null || task.Status != TaskStatus.Queued)
             return; // игнорируем дубликаты или неактуальные сообщения
 
         // ====== ФАЗА 1: Захват (быстрая транзакция) ======
+        // Вычисляем таймаут: по умолчанию 30 секунд + 5 секунд буфера для предотвращения гонки с Heartbeat
+        var timeoutSeconds = task.Execution.TimeoutSeconds ?? 30;
+        var lockDuration = TimeSpan.FromSeconds(timeoutSeconds + 5);
+
         await _unitOfWork.BeginTransactionAsync(cancellationToken);
         try
         {
-            task.StartExecution(utcNow, TimeSpan.FromSeconds(30)); // lockDuration = 30 сек
+            task.StartExecution(utcNow, lockDuration);
             await _taskRepo.UpdateAsync(task, cancellationToken);
             await _dispatcher.DispatchAsync(task.DomainEvents, cancellationToken);
             await _unitOfWork.CommitAsync(cancellationToken);
@@ -85,7 +93,10 @@ public sealed class RunExecutionCommandHandler : ICommandHandler<RunExecutionCom
             executionConfig.Method,
             executionConfig.Url,
             executionConfig.Headers,
-            executionConfig.Body);
+            executionConfig.Body)
+        {
+            Timeout = TimeSpan.FromSeconds(timeoutSeconds) // передаём таймаут
+        };
 
         HttpResponseResult response;
         try
@@ -131,13 +142,16 @@ public sealed class RunExecutionCommandHandler : ICommandHandler<RunExecutionCom
 
                 if (task.Status == TaskStatus.Failed)
                 {
-                    // Планируем повторную попытку
                     var attemptIndex = task.CurrentAttempt - 1;
-                    // Защита от выхода за границы при аномалиях данных или гонках
-                    var retryInterval = attemptIndex >= 0 && attemptIndex < task.RetryPolicy.IntervalsSeconds.Count
+                    // Базовый интервал из RetryPolicy
+                    var baseInterval = attemptIndex >= 0 && attemptIndex < task.RetryPolicy.IntervalsSeconds.Count
                         ? TimeSpan.FromSeconds(task.RetryPolicy.IntervalsSeconds[attemptIndex])
-                        : TimeSpan.FromMinutes(1); // Безопасный фолбек
-                    var nextRetryAt = utcNow + retryInterval;
+                        : TimeSpan.FromMinutes(1);
+                    
+                    // Добавляем случайный разброс (Jitter) 0–15 секунд
+                    var jitter = TimeSpan.FromSeconds(_random.Next(0, 16));
+                    var jitteredInterval = baseInterval + jitter;
+                    var nextRetryAt = utcNow + jitteredInterval;
                     task.ScheduleRetry(utcNow, nextRetryAt);
                 }
                 else if (task.Status == TaskStatus.Dead)
@@ -194,22 +208,4 @@ public sealed class RunExecutionCommandHandler : ICommandHandler<RunExecutionCom
             }
         }
     }
-
-    /*private static DateTime CalculateNextExecution(Schedule schedule, DateTime createdAt, DateTime utcNow)
-    {
-        // Аналогично расчету в CreateTaskCommandHandler
-        if (schedule.IsAbsolute)
-            return schedule.ExecuteAt!.Value.UtcDateTime;
-        if (schedule.IsOffset)
-            return createdAt + schedule.Offset!.Value;
-        if (schedule.IsCron)
-        {
-            var cronExpression = Cronos.CronExpression.Parse(schedule.CronExpression, Cronos.CronFormat.IncludeSeconds);
-            var next = cronExpression.GetNextOccurrence(createdAt, TimeZoneInfo.Utc, true);
-            if (next == null)
-                throw new InvalidOperationException("Cron expression has no future occurrences.");
-            return next.Value;
-        }
-        throw new InvalidOperationException("Schedule has no valid time specification.");
-    }*/
 }
