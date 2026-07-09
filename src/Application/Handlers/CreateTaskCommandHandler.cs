@@ -6,6 +6,7 @@ using System;
    using Application.Commands;
    using Application.Dto;
    using Application.Interfaces;
+   using Application.Mapping;
    using Domain.Entities;
    using Domain.Enums;
    using Domain.Interfaces;
@@ -48,7 +49,7 @@ using System;
            var utcNow = _dateTime.UtcNow;
    
            // 1. Маппинг Schedule (валидация взаимоисключающих полей)
-           var schedule = MapSchedule(req.Schedule);
+           var schedule = ScheduleMapper.MapSchedule(req.Schedule);
    
            // 2. Маппинг ExecutionConfig
            var execution = new ExecutionConfig(
@@ -129,50 +130,7 @@ using System;
            return task.Id.Value;
        }
        
-       /*private static DateTime CalculateNextExecution(Schedule schedule, DateTime createdAt, DateTime utcNow)
-       {
-           if (schedule.IsAbsolute)
-               return schedule.ExecuteAt!.Value.UtcDateTime;
         
-           if (schedule.IsOffset)
-               return createdAt + schedule.Offset!.Value;
-        
-           if (schedule.IsCron)
-           {
-               var cronExpression = CronExpression.Parse(schedule.CronExpression, CronFormat.IncludeSeconds);
-               // Для cron вычисляем следующее вхождение после utcNow (или createdAt? по логике — после создания)
-               // Используем created как базовое время, чтобы не пропустить первое вхождение
-               var next = cronExpression.GetNextOccurrence(createdAt, TimeZoneInfo.Utc, true);
-               if (next == null)
-                   throw new InvalidOperationException("Cron expression has no future occurrences.");
-               return next.Value;
-           }
-
-           throw new InvalidOperationException("Schedule has no valid time specification.");
-       }*/
    
-       private static Schedule MapSchedule(ScheduleDto dto)
-       {
-           if (!string.IsNullOrWhiteSpace(dto.ExecuteAt))
-               return Schedule.FromAbsolute(DateTimeOffset.Parse(dto.ExecuteAt));
-           if (!string.IsNullOrWhiteSpace(dto.Offset))
-               return Schedule.FromOffset(ParseOffset(dto.Offset));
-           if (!string.IsNullOrWhiteSpace(dto.Cron))
-               return Schedule.FromCron(dto.Cron, dto.Timezone ?? "UTC");
-           throw new ArgumentException("Одно из полей ExecuteAt, Offset или Cron должно быть заполнено.");
-       }
-   
-       private static TimeSpan ParseOffset(string offset)
-       {
-           var unit = offset[^1];
-           var value = int.Parse(offset[..^1]);
-           return unit switch
-           {
-               's' => TimeSpan.FromSeconds(value),
-               'm' => TimeSpan.FromMinutes(value),
-               'h' => TimeSpan.FromHours(value),
-               'd' => TimeSpan.FromDays(value),
-               _ => throw new ArgumentException($"Неизвестная единица смещения: {unit}")
-           };
-       }
+      
    }

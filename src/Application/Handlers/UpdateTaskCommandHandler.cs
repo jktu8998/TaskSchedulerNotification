@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Application.Commands;
 using Application.Dto;
 using Application.Interfaces;
+using Application.Mapping;
 using Cronos;
 using Domain.Entities;
 using Domain.Enums;
@@ -57,7 +58,7 @@ public sealed class UpdateTaskCommandHandler : ICommandHandler<UpdateTaskCommand
 
         // 2. Создаём новое задание на основе DTO
         var req = command.UpdatedFields;
-        var schedule = MapSchedule(req.Schedule);
+        var schedule =ScheduleMapper.MapSchedule(req.Schedule);
         var execution = new ExecutionConfig(req.Execution.Method, req.Execution.Url,
             req.Execution.Headers, req.Execution.Body);
 
@@ -125,28 +126,5 @@ public sealed class UpdateTaskCommandHandler : ICommandHandler<UpdateTaskCommand
         return newTask.Id.Value;
     }
 
-    private static Schedule MapSchedule(ScheduleDto dto)
-    {
-        if (!string.IsNullOrWhiteSpace(dto.ExecuteAt))
-            return Schedule.FromAbsolute(DateTimeOffset.Parse(dto.ExecuteAt));
-        if (!string.IsNullOrWhiteSpace(dto.Offset))
-            return Schedule.FromOffset(ParseOffset(dto.Offset));
-        if (!string.IsNullOrWhiteSpace(dto.Cron))
-            return Schedule.FromCron(dto.Cron, dto.Timezone ?? "UTC");
-        throw new ArgumentException("Одно из полей ExecuteAt, Offset или Cron должно быть заполнено.");
-    }
-
-    private static TimeSpan ParseOffset(string offset)
-    {
-        var unit = offset[^1];
-        var value = int.Parse(offset[..^1]);
-        return unit switch
-        {
-            's' => TimeSpan.FromSeconds(value),
-            'm' => TimeSpan.FromMinutes(value),
-            'h' => TimeSpan.FromHours(value),
-            'd' => TimeSpan.FromDays(value),
-            _ => throw new ArgumentException($"Неизвестная единица смещения: {unit}")
-        };
-    }
+    
 }

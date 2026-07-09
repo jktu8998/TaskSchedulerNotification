@@ -9,7 +9,7 @@ namespace Application.Queries;
 /// Результаты автоматически ограничиваются текущим отправителем.
 /// </summary>
 public sealed record GetTasksQuery(
-    string SenderId,
+   // string SenderId,
     int Skip,
     int Take,
     string? Status = null,

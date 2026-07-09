@@ -17,5 +17,5 @@ public interface IMessageQueue
     /// <summary>
     /// Подписаться на очередь. Вызывает handler при поступлении нового задания.
     /// </summary>
-    Task SubscribeAsync(Func<TaskId, Task> handler, CancellationToken cancellationToken = default);
+    Task SubscribeAsync(Func<TaskId, CancellationToken, Task> handler, CancellationToken cancellationToken = default);
 }

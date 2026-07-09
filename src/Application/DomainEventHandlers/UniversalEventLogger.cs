@@ -30,10 +30,14 @@ public sealed class UniversalEventLogger<TEvent> : IDomainEventHandler<TEvent>
 
     public async Task HandleAsync(TEvent domainEvent, CancellationToken cancellationToken = default)
     {
+        // Быстрая сериализация самого события для сохранения контекста
+        var detailsJson = System.Text.Json.JsonSerializer.Serialize(domainEvent);
+
         var log = new TaskLog(
             domainEvent.TaskId,
             EventType,
-            _dateTime.UtcNow);
+            _dateTime.UtcNow,
+            details: detailsJson); // Пишем контекст в лог
 
         await _logRepo.AddAsync(log, cancellationToken);
     }
