@@ -71,7 +71,8 @@ public sealed class GetTasksQueryHandler : IQueryHandler<GetTasksQuery, IReadOnl
                 Method = task.Execution.Method,
                 Url = task.Execution.Url,
                 Headers = task.Execution.Headers?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
-                Body = task.Execution.Body
+                Body = task.Execution.Body,
+                TimeoutSeconds = task.Execution.TimeoutSeconds
             },
             ResultDelivery = task.ResultDelivery != null ? new ResultDeliveryConfigDto
             {
