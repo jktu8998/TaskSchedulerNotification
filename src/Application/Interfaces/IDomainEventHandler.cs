@@ -13,3 +13,9 @@ public interface IDomainEventHandler<in TEvent> where TEvent : IDomainEvent
 {
     Task HandleAsync(TEvent domainEvent, CancellationToken cancellationToken = default);
 }
+
+/*
+ВНИМАНИЕ: Все реализации IDomainEventHandler<T> выполняются синхронно в рамках открытой транзакции БД.
+Внутри хендлеров ЗАПРЕЩЕНО выполнять сетевые запросы, долгие I/O операции или обращения к сторонним API.
+Разрешены только быстрые операции с БД в рамках текущего IUnitOfWork
+*/

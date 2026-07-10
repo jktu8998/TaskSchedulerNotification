@@ -1,5 +1,5 @@
 using System;
-
+using Newtonsoft.Json;
 namespace Domain.ValueObjects;
 
 /// <summary>
@@ -26,7 +26,12 @@ public sealed record Schedule
     public string? Timezone { get; init; }
 
     // Приватный конструктор — только фабрики могут создавать объект.
-    private Schedule(DateTimeOffset? executeAt, TimeSpan? offset, string? cron, string? timezone)
+    [JsonConstructor]
+    private Schedule(
+        [JsonProperty("ExecuteAt")] DateTimeOffset? executeAt,
+        [JsonProperty("Offset")] TimeSpan? offset,
+        [JsonProperty("CronExpression")] string? cron,
+        [JsonProperty("Timezone")] string? timezone)
     {
         ExecuteAt = executeAt;
         Offset = offset;
