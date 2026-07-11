@@ -99,7 +99,8 @@ public sealed class RabbitMqMessageQueue : IMessageQueue, IAsyncDisposable
             throw new InvalidOperationException($"Сообщение не было подтверждено брокером RabbitMQ: {ex.Message}", ex);
         }
     }
-
+    
+     
     public Task SubscribeAsync(Func<TaskId, CancellationToken, Task> handler, CancellationToken ct = default)
     {
         // TODO: реализовать асинхронного потребителя с помощью AsyncEventingBasicConsumer
