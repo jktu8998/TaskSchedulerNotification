@@ -39,7 +39,7 @@ public interface ITaskRepository
     /// Получить задания в статусе Executing, которые висят дольше указанного времени.
     /// Используется для механизма Heartbeat — обнаружения зависших задач.
     /// </summary>
-    Task<IReadOnlyList<ScheduledTask>> GetExecutingOlderThanAsync(TimeSpan timeout, CancellationToken cancellationToken = default);
+    // Task<IReadOnlyList<ScheduledTask>> GetExecutingOlderThanAsync(TimeSpan timeout, CancellationToken cancellationToken = default);
 
     /// <summary>Обновить существующее задание (статус, свойства).</summary>
     Task UpdateAsync(ScheduledTask task, CancellationToken cancellationToken = default);

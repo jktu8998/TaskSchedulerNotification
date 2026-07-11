@@ -19,7 +19,7 @@ public static class DapperTypeHandlerConfig
     {
         if (_registered) return;
         _registered = true;
-
+        Dapper.DefaultTypeMap.MatchNamesWithUnderscores = true;
         // TaskId ↔ Guid
         SqlMapper.AddTypeHandler(new TaskIdTypeHandler());
 
