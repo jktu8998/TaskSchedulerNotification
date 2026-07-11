@@ -32,4 +32,5 @@ public sealed class OutboxMessage
         TaskId = taskId;
         CreatedAt = createdAt;
     }
+    private OutboxMessage() { } // для Dapper
 }

@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Domain.Entities;
 
-namespace Application.Interfaces;
+namespace Domain.Interfaces;
 
 /// <summary>
 /// Контракт для хранилища исходящих сообщений (Transactional Outbox).

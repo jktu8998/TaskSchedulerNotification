@@ -26,7 +26,8 @@ public sealed class DapperTaskRepository : ITaskRepository
     {
         _db = db;
     }
-
+    // ::jsonb в SQL больше не нужны, хендлер сам укажет NpgsqlDbType.Jsonb
+    // Никакого JsonSerializer.Serialize! Передаем объекты напрямую.
     public async Task AddAsync(ScheduledTask task, CancellationToken ct = default)
     {
         const string sql = @"

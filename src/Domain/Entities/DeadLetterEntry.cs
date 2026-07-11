@@ -25,4 +25,5 @@ public sealed class DeadLetterEntry
         ErrorDetails = errorDetails;
         MovedAt = utcNow;
     }
+    private DeadLetterEntry() { } // для Dapper
 }
