@@ -1,6 +1,4 @@
-// Infrastructure/Persistence/TypeHandlers/TaskIdTypeHandler.cs
 
-using System;
 using System.Data;
 using Dapper;
 using Domain.ValueObjects;

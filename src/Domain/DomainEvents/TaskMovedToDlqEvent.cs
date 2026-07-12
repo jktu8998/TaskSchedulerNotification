@@ -1,4 +1,3 @@
-using Domain.DomainEvents;
 using Domain.ValueObjects;
 
 namespace Domain.DomainEvents;

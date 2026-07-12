@@ -1,4 +1,3 @@
-using System;
 using Application.Dto;
 
 namespace Application.Queries;

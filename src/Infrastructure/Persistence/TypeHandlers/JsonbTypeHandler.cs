@@ -1,6 +1,4 @@
-// Infrastructure/Persistence/TypeHandlers/JsonbTypeHandler.cs  
 
-using System;
 using System.Data;
 using Dapper;
 using Newtonsoft.Json;

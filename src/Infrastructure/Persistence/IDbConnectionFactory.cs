@@ -1,5 +1,4 @@
-// Infrastructure/Persistence/IDbConnectionFactory.cs
-using System.Data;
+
 using Npgsql;
 
 namespace Infrastructure.Persistence;

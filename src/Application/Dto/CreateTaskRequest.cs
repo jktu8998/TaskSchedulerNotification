@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-using Domain.Enums;
 
 namespace Application.Dto;
 

@@ -1,10 +1,5 @@
-using System;
-   using System.Collections.Generic;
-   using System.Threading;
-   using System.Threading.Tasks;
-   using Cronos;
+
    using Application.Commands;
-   using Application.Dto;
    using Application.Interfaces;
    using Application.Mapping;
    using Domain.Entities;

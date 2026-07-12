@@ -1,7 +1,4 @@
-// Infrastructure/Persistence/Repositories/DapperPollingStateRepository.cs
 
-using System.Threading;
-using System.Threading.Tasks;
 using Dapper;
 using Domain.Entities;
 using Domain.Interfaces;

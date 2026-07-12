@@ -1,8 +1,4 @@
-// Infrastructure/Persistence/Repositories/DapperTaskLogRepository.cs
 
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 using Dapper;
 using Domain.Entities;
 using Domain.Interfaces;

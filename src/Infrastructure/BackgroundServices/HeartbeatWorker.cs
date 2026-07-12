@@ -1,8 +1,4 @@
-// Infrastructure/BackgroundServices/HeartbeatWorker.cs
 
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Application.Commands;
 using Application.Handlers;
 using Microsoft.Extensions.DependencyInjection;

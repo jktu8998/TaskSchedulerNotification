@@ -1,7 +1,4 @@
-// Infrastructure/DependencyInjection.cs
 
-using System;
-using Application.Handlers;
 using Application.Interfaces;
 using Domain.Interfaces;
 using Infrastructure.BackgroundServices;

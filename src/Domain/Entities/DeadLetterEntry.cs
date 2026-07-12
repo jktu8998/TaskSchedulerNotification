@@ -1,4 +1,3 @@
-using System;
 using Domain.ValueObjects;
 
 namespace Domain.Entities;

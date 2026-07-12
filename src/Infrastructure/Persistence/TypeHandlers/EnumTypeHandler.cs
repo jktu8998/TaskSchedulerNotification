@@ -1,6 +1,4 @@
-// Infrastructure/Persistence/TypeHandlers/EnumTypeHandler.cs
 
-using System;
 using System.Data;
 using Dapper;
 

@@ -1,4 +1,3 @@
-using System;
 using System.Reflection;
 using DbUp;
 using DbUp.Engine.Output;

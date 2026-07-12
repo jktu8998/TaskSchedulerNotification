@@ -1,13 +1,7 @@
-// Infrastructure/BackgroundServices/TaskExecutionWorker.cs
 
-using System;
 using System.Text;
-using System.Text.Json;
-using System.Threading;
-using System.Threading.Tasks;
 using Application.Commands;
 using Application.Handlers;
-using Application.Interfaces; // Для ICommandHandler
 using Domain.ValueObjects;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;

@@ -1,8 +1,4 @@
-// Infrastructure/BackgroundServices/OutboxProcessorWorker.cs
 
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Application.Interfaces;
 using Domain.Interfaces;
 using Microsoft.Extensions.DependencyInjection;

@@ -1,7 +1,6 @@
-// Infrastructure/System/AesEncryptionService.cs
-using System;
+
 using System.Security.Cryptography;
-using System.Text; // <-- Подключенный неймспейс
+using System.Text; 
 using Application.Interfaces;
 
 namespace Infrastructure.SystemUtilities;

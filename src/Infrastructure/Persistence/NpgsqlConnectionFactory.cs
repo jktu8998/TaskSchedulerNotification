@@ -1,4 +1,3 @@
-// Infrastructure/Persistence/NpgsqlConnectionFactory.cs
 using Npgsql;
 
 namespace Infrastructure.Persistence;

@@ -1,4 +1,3 @@
-// Infrastructure/Persistence/TypeHandlers/DapperTypeHandlerConfig.cs
 
 using Dapper;
 using Domain.Enums;
