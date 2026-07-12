@@ -14,7 +14,6 @@ using Domain.ValueObjects;
 using Moq;
 using Xunit;
 using FluentAssertions;
-using TaskStatus = Domain.Enums.TaskStatus;
 
 namespace Application.Tests.Handlers;
 
@@ -113,7 +112,7 @@ public class CreateTaskCommandHandlerTests
 
         task.SenderId.Should().Be("test-sender");
         task.Type.Should().Be(TaskType.OneTime);
-        task.Status.Should().Be(TaskStatus.Scheduled);
+        task.Status.Should().Be(StatusTask.Scheduled);
         task.Schedule.IsAbsolute.Should().BeTrue();
         
         // Проверка nullable свойств внутри агрегата (используем ! для успокоения компилятора)

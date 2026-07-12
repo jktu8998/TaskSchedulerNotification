@@ -13,7 +13,6 @@ using Domain.ValueObjects;
 using Moq;
 using Newtonsoft.Json;
 using Xunit;
-using TaskStatus = Domain.Enums.TaskStatus;
 
 namespace Application.Tests.Handlers;
 
@@ -92,7 +91,7 @@ public class RetryFromDlqCommandHandlerTests
         Assert.NotEqual(originalTaskId, capturedNewTask.Id.Value);
         Assert.Equal("sender-original", capturedNewTask.SenderId);
         Assert.Equal(TaskType.OneTime, capturedNewTask.Type);
-        Assert.Equal(TaskStatus.Scheduled, capturedNewTask.Status);
+        Assert.Equal(StatusTask.Scheduled, capturedNewTask.Status);
         Assert.Equal(new DateTime(2026, 8, 1, 0, 0, 0, DateTimeKind.Utc), capturedNewTask.Schedule.ExecuteAt?.UtcDateTime);
         Assert.Equal("POST", capturedNewTask.Execution.Method);
         Assert.Equal("https://target.example.com", capturedNewTask.Execution.Url);

@@ -4,7 +4,7 @@ namespace Domain.Enums;
 /// Статусы жизненного цикла задания. 
 /// Определяют, в каком состоянии находится задание в данный момент.
 /// </summary>
-public enum TaskStatus
+public enum StatusTask
 {
     /// <summary>Задание создано, но ещё не запланировано.</summary>
     Created = 0,

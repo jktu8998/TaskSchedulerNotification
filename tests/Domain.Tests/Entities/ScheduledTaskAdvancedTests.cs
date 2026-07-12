@@ -5,14 +5,13 @@ using Domain.Entities;
 using Domain.Enums;
 using Domain.ValueObjects;
 using Xunit;
-using TaskStatus = Domain.Enums.TaskStatus;
 
 namespace Domain.Tests.Entities;
 
 public class ScheduledTaskAdvancedTests
 {
     // Вспомогательный метод для создания задания в нужном статусе
-    private ScheduledTask CreateTaskInStatus(TaskStatus targetStatus, out DateTime utcNow, 
+    private ScheduledTask CreateTaskInStatus(StatusTask target, out DateTime utcNow, 
         RetryPolicy? retryPolicy = null, TaskType type = TaskType.OneTime)
     {
         utcNow = new DateTime(2026, 7, 10, 12, 0, 0, DateTimeKind.Utc);
@@ -25,35 +24,35 @@ public class ScheduledTaskAdvancedTests
             null, null, retryPolicy, null,
             utcNow);
 
-        switch (targetStatus)
+        switch (target)
         {
-            case TaskStatus.Created:
+            case StatusTask.Created:
                 return task;
-            case TaskStatus.Scheduled:
+            case StatusTask.Scheduled:
                 task.ScheduleTask(utcNow, utcNow.AddHours(1));
                 break;
-            case TaskStatus.Queued:
+            case StatusTask.Queued:
                 task.ScheduleTask(utcNow, utcNow.AddHours(1));
                 task.Enqueue(utcNow);
                 break;
-            case TaskStatus.Executing:
+            case StatusTask.Executing:
                 task.ScheduleTask(utcNow, utcNow.AddHours(1));
                 task.Enqueue(utcNow);
                 task.StartExecution(utcNow, TimeSpan.FromSeconds(30));
                 break;
-            case TaskStatus.Completed:
+            case StatusTask.Completed:
                 task.ScheduleTask(utcNow, utcNow.AddHours(1));
                 task.Enqueue(utcNow);
                 task.StartExecution(utcNow, TimeSpan.FromSeconds(30));
                 task.CompleteSuccessfully(utcNow);
                 break;
-            case TaskStatus.Failed:
+            case StatusTask.Failed:
                 task.ScheduleTask(utcNow, utcNow.AddHours(1));
                 task.Enqueue(utcNow);
                 task.StartExecution(utcNow, TimeSpan.FromSeconds(30));
                 task.MarkFailed(utcNow);
                 break;
-            case TaskStatus.Dead:
+            case StatusTask.Dead:
                 // используем кастомный retry с 1 попыткой
                 var oneAttemptRetry = new RetryPolicy(new[] { 60 });
                 task = new ScheduledTask(
@@ -66,11 +65,11 @@ public class ScheduledTaskAdvancedTests
                 task.StartExecution(utcNow, TimeSpan.FromSeconds(30));
                 task.MarkFailed(utcNow);
                 break;
-            case TaskStatus.Paused:
+            case StatusTask.Paused:
                 task.ScheduleTask(utcNow, utcNow.AddHours(1));
                 task.Pause(utcNow);
                 break;
-            case TaskStatus.Cancelled:
+            case StatusTask.Cancelled:
                 task.ScheduleTask(utcNow, utcNow.AddHours(1));
                 task.Cancel(utcNow);
                 break;
@@ -83,11 +82,11 @@ public class ScheduledTaskAdvancedTests
     [Fact]
     public void Reschedule_FromExecuting_TransitionsToScheduled()
     {
-        var task = CreateTaskInStatus(TaskStatus.Executing, out var utcNow);
+        var task = CreateTaskInStatus(StatusTask.Executing, out var utcNow);
         var nextTime = utcNow.AddHours(2);
         task.Reschedule(utcNow, nextTime);
 
-        Assert.Equal(TaskStatus.Scheduled, task.Status);
+        Assert.Equal(StatusTask.Scheduled, task.Status);
         Assert.Equal(nextTime, task.NextExecutionAt);
         Assert.Null(task.LockedUntil);
         Assert.Single(task.DomainEvents, e => e is TaskScheduledEvent);
@@ -96,10 +95,10 @@ public class ScheduledTaskAdvancedTests
     [Fact]
     public void Reschedule_FromNonExecuting_Throws()
     {
-        foreach (TaskStatus status in Enum.GetValues(typeof(TaskStatus)))
+        foreach (StatusTask status in Enum.GetValues(typeof(StatusTask)))
         {
-            if (status == TaskStatus.Executing) continue;
-            if (status == TaskStatus.Completed || status == TaskStatus.Dead || status == TaskStatus.Cancelled)
+            if (status == StatusTask.Executing) continue;
+            if (status == StatusTask.Completed || status == StatusTask.Dead || status == StatusTask.Cancelled)
                 continue; // нельзя создать задание в этих статусах через вспомогательный метод, кроме Executing и т.д.
             var task = CreateTaskInStatus(status, out var utcNow);
             Assert.Throws<InvalidOperationException>(() => task.Reschedule(utcNow, utcNow.AddHours(1)));
@@ -111,11 +110,11 @@ public class ScheduledTaskAdvancedTests
     [Fact]
     public void ScheduleRetry_FromFailed_TransitionsToScheduled()
     {
-        var task = CreateTaskInStatus(TaskStatus.Failed, out var utcNow);
+        var task = CreateTaskInStatus(StatusTask.Failed, out var utcNow);
         var nextAttemptTime = utcNow.AddSeconds(60);
         task.ScheduleRetry(utcNow, nextAttemptTime);
 
-        Assert.Equal(TaskStatus.Scheduled, task.Status);
+        Assert.Equal(StatusTask.Scheduled, task.Status);
         Assert.Equal(nextAttemptTime, task.NextExecutionAt);
         Assert.Null(task.LockedUntil);
         Assert.Single(task.DomainEvents, e => e is TaskScheduledEvent);
@@ -124,9 +123,9 @@ public class ScheduledTaskAdvancedTests
     [Fact]
     public void ScheduleRetry_FromNonFailed_Throws()
     {
-        foreach (TaskStatus status in Enum.GetValues(typeof(TaskStatus)))
+        foreach (StatusTask status in Enum.GetValues(typeof(StatusTask)))
         {
-            if (status == TaskStatus.Failed) continue;
+            if (status == StatusTask.Failed) continue;
             var task = CreateTaskInStatus(status, out var utcNow);
             Assert.Throws<InvalidOperationException>(() => task.ScheduleRetry(utcNow, utcNow.AddSeconds(60)));
         }
@@ -137,7 +136,7 @@ public class ScheduledTaskAdvancedTests
     [Fact]
     public void ClearDomainEvents_RemovesAllEvents()
     {
-        var task = CreateTaskInStatus(TaskStatus.Scheduled, out var utcNow);
+        var task = CreateTaskInStatus(StatusTask.Scheduled, out var utcNow);
         task.Pause(utcNow);
         Assert.NotEmpty(task.DomainEvents);
         task.ClearDomainEvents();
@@ -149,10 +148,10 @@ public class ScheduledTaskAdvancedTests
     [Fact]
     public void Cancel_FromExecuting_ResetsLockedUntil()
     {
-        var task = CreateTaskInStatus(TaskStatus.Executing, out var utcNow);
+        var task = CreateTaskInStatus(StatusTask.Executing, out var utcNow);
         Assert.NotNull(task.LockedUntil);
         task.Cancel(utcNow);
-        Assert.Equal(TaskStatus.Cancelled, task.Status);
+        Assert.Equal(StatusTask.Cancelled, task.Status);
         Assert.Null(task.LockedUntil);
         Assert.Single(task.DomainEvents, e => e is TaskCancelledEvent);
     }

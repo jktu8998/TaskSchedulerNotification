@@ -12,7 +12,6 @@ using Domain.Interfaces;
 using Domain.ValueObjects;
 using Moq;
 using Xunit;
-using TaskStatus = Domain.Enums.TaskStatus;
 
 namespace Application.Tests.Handlers;
 
@@ -41,7 +40,7 @@ public class ResumeTaskCommandHandlerTests
         );
     }
 
-    private ScheduledTask CreateTask(Guid taskId, string senderId = "test-sender", TaskStatus status = TaskStatus.Paused)
+    private ScheduledTask CreateTask(Guid taskId, string senderId = "test-sender", StatusTask status = StatusTask.Paused)
     {
         var task = new ScheduledTask(
             TaskId.From(taskId),
@@ -52,12 +51,12 @@ public class ResumeTaskCommandHandlerTests
             null, null, null, null,
             _utcNow);
 
-        if (status == TaskStatus.Paused)
+        if (status == StatusTask.Paused)
         {
             task.ScheduleTask(_utcNow, _utcNow.AddHours(1));
             task.Pause(_utcNow);
         }
-        else if (status == TaskStatus.Scheduled)
+        else if (status == StatusTask.Scheduled)
         {
             task.ScheduleTask(_utcNow, _utcNow.AddHours(1));
         }
@@ -71,7 +70,7 @@ public class ResumeTaskCommandHandlerTests
     {
         // Arrange
         var taskId = Guid.NewGuid();
-        var task = CreateTask(taskId, "test-sender", TaskStatus.Paused);
+        var task = CreateTask(taskId, "test-sender", StatusTask.Paused);
         _taskRepoMock
             .Setup(r => r.GetByIdAsync(TaskId.From(taskId), It.Is<CancellationToken>(ct => ct == _ct)))
             .ReturnsAsync(task);
@@ -90,7 +89,7 @@ public class ResumeTaskCommandHandlerTests
         // Assert
         Assert.NotNull(capturedTask);
         Assert.Equal(taskId, capturedTask.Id.Value);
-        Assert.Equal(TaskStatus.Scheduled, capturedTask.Status);
+        Assert.Equal(StatusTask.Scheduled, capturedTask.Status);
 
         _unitOfWorkMock.Verify(u => u.BeginTransactionAsync(It.Is<CancellationToken>(ct => ct == _ct)), Times.Once);
         _unitOfWorkMock.Verify(u => u.CommitAsync(It.Is<CancellationToken>(ct => ct == _ct)), Times.Once);
@@ -117,7 +116,7 @@ public class ResumeTaskCommandHandlerTests
     public async Task HandleAsync_WrongSender_ThrowsInvalidOperationException()
     {
         var taskId = Guid.NewGuid();
-        var task = CreateTask(taskId, "other-sender", TaskStatus.Paused);
+        var task = CreateTask(taskId, "other-sender", StatusTask.Paused);
         _taskRepoMock.Setup(r => r.GetByIdAsync(TaskId.From(taskId), It.Is<CancellationToken>(ct => ct == _ct)))
             .ReturnsAsync(task);
 
@@ -130,7 +129,7 @@ public class ResumeTaskCommandHandlerTests
     public async Task HandleAsync_TaskNotInPaused_ThrowsInvalidOperationException()
     {
         var taskId = Guid.NewGuid();
-        var task = CreateTask(taskId, "test-sender", TaskStatus.Scheduled);
+        var task = CreateTask(taskId, "test-sender", StatusTask.Scheduled);
         _taskRepoMock.Setup(r => r.GetByIdAsync(TaskId.From(taskId), It.Is<CancellationToken>(ct => ct == _ct)))
             .ReturnsAsync(task);
 
@@ -144,7 +143,7 @@ public class ResumeTaskCommandHandlerTests
     public async Task HandleAsync_CommitFails_RollsBackAndThrows()
     {
         var taskId = Guid.NewGuid();
-        var task = CreateTask(taskId, "test-sender", TaskStatus.Paused);
+        var task = CreateTask(taskId, "test-sender", StatusTask.Paused);
         _taskRepoMock.Setup(r => r.GetByIdAsync(TaskId.From(taskId), It.Is<CancellationToken>(ct => ct == _ct)))
             .ReturnsAsync(task);
         _unitOfWorkMock.Setup(u => u.CommitAsync(It.Is<CancellationToken>(ct => ct == _ct)))

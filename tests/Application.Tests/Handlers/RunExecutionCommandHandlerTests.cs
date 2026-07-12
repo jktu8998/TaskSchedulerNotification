@@ -13,7 +13,6 @@ using Domain.Interfaces;
 using Domain.ValueObjects;
 using Moq;
 using Xunit;
-using TaskStatus = Domain.Enums.TaskStatus;
 
 namespace Application.Tests.Handlers;
 
@@ -50,7 +49,7 @@ public class RunExecutionCommandHandlerTests
         Guid taskId,
         string senderId = "sender",
         TaskType type = TaskType.OneTime,
-        TaskStatus status = TaskStatus.Queued,
+        StatusTask status = StatusTask.Queued,
         int? timeoutSeconds = null,
         RetryPolicy? retryPolicy = null,
         ResultDeliveryConfig? resultDelivery = null,
@@ -69,18 +68,18 @@ public class RunExecutionCommandHandlerTests
             _utcNow);
 
         // Приводим к нужному статусу
-        if (status == TaskStatus.Queued)
+        if (status == StatusTask.Queued)
         {
             task.ScheduleTask(_utcNow, _utcNow.AddHours(1));
             task.Enqueue(_utcNow);
         }
-        else if (status == TaskStatus.Executing)
+        else if (status == StatusTask.Executing)
         {
             task.ScheduleTask(_utcNow, _utcNow.AddHours(1));
             task.Enqueue(_utcNow);
             task.StartExecution(_utcNow, TimeSpan.FromSeconds(30));
         }
-        else if (status == TaskStatus.Completed)
+        else if (status == StatusTask.Completed)
         {
             task.ScheduleTask(_utcNow, _utcNow.AddHours(1));
             task.Enqueue(_utcNow);
@@ -98,7 +97,7 @@ public class RunExecutionCommandHandlerTests
     {
         // Arrange
         var taskId = Guid.NewGuid();
-        var task = CreateTaskInStatus(taskId, status: TaskStatus.Queued);
+        var task = CreateTaskInStatus(taskId, status: StatusTask.Queued);
         _taskRepoMock.Setup(r => r.GetByIdAsync(TaskId.From(taskId), It.Is<CancellationToken>(ct => ct == _ct)))
             .ReturnsAsync(task);
 
@@ -116,7 +115,7 @@ public class RunExecutionCommandHandlerTests
 
         // Assert
         Assert.NotNull(capturedTask);
-        Assert.Equal(TaskStatus.Completed, capturedTask.Status);
+        Assert.Equal(StatusTask.Completed, capturedTask.Status);
         Assert.Null(capturedTask.LockedUntil);
 
         // Фазы: захват (одна транзакция), фиксация (вторая транзакция)
@@ -156,7 +155,7 @@ public class RunExecutionCommandHandlerTests
 
         // Assert
         Assert.NotNull(capturedTask);
-        Assert.Equal(TaskStatus.Scheduled, capturedTask.Status); // перепланировано
+        Assert.Equal(StatusTask.Scheduled, capturedTask.Status); // перепланировано
         Assert.NotNull(capturedTask.NextExecutionAt);
         Assert.True(capturedTask.NextExecutionAt > _utcNow);
         Assert.Null(capturedTask.LockedUntil);
@@ -167,7 +166,7 @@ public class RunExecutionCommandHandlerTests
     {
         // Arrange
         var taskId = Guid.NewGuid();
-        var task = CreateTaskInStatus(taskId, status: TaskStatus.Queued);
+        var task = CreateTaskInStatus(taskId, status: StatusTask.Queued);
         _taskRepoMock.Setup(r => r.GetByIdAsync(TaskId.From(taskId), It.IsAny<CancellationToken>()))
             .ReturnsAsync(task);
 
@@ -183,7 +182,7 @@ public class RunExecutionCommandHandlerTests
 
         // Assert
         Assert.NotNull(capturedTask);
-        Assert.Equal(TaskStatus.Scheduled, capturedTask.Status); // Failed -> Scheduled через ScheduleRetry
+        Assert.Equal(StatusTask.Scheduled, capturedTask.Status); // Failed -> Scheduled через ScheduleRetry
         // Проверка Jitter: базовый интервал 60 сек + случайный 5 сек
         var expectedRetryTime = _utcNow.AddSeconds(65);
         Assert.Equal(expectedRetryTime, capturedTask.NextExecutionAt);
@@ -214,7 +213,7 @@ public class RunExecutionCommandHandlerTests
 
         // Assert
         Assert.NotNull(capturedTask);
-        Assert.Equal(TaskStatus.Dead, capturedTask.Status);
+        Assert.Equal(StatusTask.Dead, capturedTask.Status);
 
         // Проверяем, что запись в DLQ добавлена
         _dlqRepoMock.Verify(d => d.AddAsync(It.IsAny<DeadLetterEntry>(), It.Is<CancellationToken>(ct => ct == _ct)), Times.Once);
@@ -250,7 +249,7 @@ public class RunExecutionCommandHandlerTests
     {
         // Arrange
         var taskId = Guid.NewGuid();
-        var task = CreateTaskInStatus(taskId, status: TaskStatus.Completed); // уже завершено
+        var task = CreateTaskInStatus(taskId, status: StatusTask.Completed); // уже завершено
         _taskRepoMock.Setup(r => r.GetByIdAsync(TaskId.From(taskId), It.IsAny<CancellationToken>()))
             .ReturnsAsync(task);
 
@@ -287,7 +286,7 @@ public class RunExecutionCommandHandlerTests
     {
         // Arrange
         var taskId = Guid.NewGuid();
-        var task = CreateTaskInStatus(taskId, status: TaskStatus.Executing);
+        var task = CreateTaskInStatus(taskId, status: StatusTask.Executing);
         _taskRepoMock.Setup(r => r.GetByIdAsync(TaskId.From(taskId), It.Is<CancellationToken>(ct => ct == _ct)))
             .ReturnsAsync(task);
     
@@ -304,7 +303,7 @@ public class RunExecutionCommandHandlerTests
     {
         // Arrange
         var taskId = Guid.NewGuid();
-        var task = CreateTaskInStatus(taskId, status: TaskStatus.Queued);
+        var task = CreateTaskInStatus(taskId, status: StatusTask.Queued);
         _taskRepoMock.Setup(r => r.GetByIdAsync(TaskId.From(taskId), It.Is<CancellationToken>(ct => ct == _ct)))
             .ReturnsAsync(task);
     
@@ -323,7 +322,7 @@ public class RunExecutionCommandHandlerTests
     {
         // Arrange
         var taskId = Guid.NewGuid();
-        var task = CreateTaskInStatus(taskId, status: TaskStatus.Queued);
+        var task = CreateTaskInStatus(taskId, status: StatusTask.Queued);
         _taskRepoMock.Setup(r => r.GetByIdAsync(TaskId.From(taskId), It.Is<CancellationToken>(ct => ct == _ct)))
             .ReturnsAsync(task);
 
@@ -347,7 +346,7 @@ public class RunExecutionCommandHandlerTests
     {
         // Arrange
         var taskId = Guid.NewGuid();
-        var task = CreateTaskInStatus(taskId, status: TaskStatus.Queued);
+        var task = CreateTaskInStatus(taskId, status: StatusTask.Queued);
         _taskRepoMock.Setup(r => r.GetByIdAsync(TaskId.From(taskId), It.Is<CancellationToken>(ct => ct == _ct)))
             .ReturnsAsync(task);
     
@@ -355,7 +354,7 @@ public class RunExecutionCommandHandlerTests
         _taskRepoMock.Setup(r => r.GetByIdAsync(TaskId.From(taskId), It.Is<CancellationToken>(ct => ct == _ct)))
             .ReturnsAsync(task); // первый вызов для загрузки
         // После того как захват выполнен, перезагружаем задание в фазе 3, возвращаем задание в статусе Cancelled
-        var cancelledTask = CreateTaskInStatus(taskId, status: TaskStatus.Queued);
+        var cancelledTask = CreateTaskInStatus(taskId, status: StatusTask.Queued);
         cancelledTask.Cancel(_utcNow); // статус Cancelled
         _taskRepoMock.SetupSequence(r => r.GetByIdAsync(TaskId.From(taskId), It.IsAny<CancellationToken>()))
             .ReturnsAsync(task)        // для начальной загрузки
@@ -398,7 +397,7 @@ public class RunExecutionCommandHandlerTests
     
         // Assert: задание всё равно Completed
         Assert.NotNull(capturedTask);
-        Assert.Equal(TaskStatus.Completed, capturedTask.Status);
+        Assert.Equal(StatusTask.Completed, capturedTask.Status);
         // Http executor вызывался дважды
         _httpExecutorMock.Verify(h => h.ExecuteAsync(It.IsAny<HttpRequestConfig>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
     }

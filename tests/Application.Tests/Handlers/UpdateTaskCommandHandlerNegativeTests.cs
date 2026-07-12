@@ -11,7 +11,6 @@ using Domain.Interfaces;
 using Domain.ValueObjects;
 using Moq;
 using Xunit;
-using TaskStatus = Domain.Enums.TaskStatus;
 
 namespace Application.Tests.Handlers;
 
@@ -43,7 +42,7 @@ public class UpdateTaskCommandHandlerNegativeTests
     }
 
     // Вспомогательный метод для создания существующего задания
-    private ScheduledTask CreateTask(Guid taskId, string senderId, TaskStatus status = TaskStatus.Scheduled)
+    private ScheduledTask CreateTask(Guid taskId, string senderId, StatusTask status = StatusTask.Scheduled)
     {
         var task = new ScheduledTask(
             TaskId.From(taskId),
@@ -55,18 +54,18 @@ public class UpdateTaskCommandHandlerNegativeTests
             _utcNow);
 
         // Принудительно установим статус, если требуется (через последовательность переходов)
-        if (status == TaskStatus.Completed)
+        if (status == StatusTask.Completed)
         {
             task.ScheduleTask(_utcNow, _utcNow.AddHours(1));
             task.Enqueue(_utcNow);
             task.StartExecution(_utcNow, TimeSpan.FromSeconds(30));
             task.CompleteSuccessfully(_utcNow);
         }
-        else if (status == TaskStatus.Cancelled)
+        else if (status == StatusTask.Cancelled)
         {
             task.Cancel(_utcNow);
         }
-        else if (status == TaskStatus.Dead)
+        else if (status == StatusTask.Dead)
         {
             // Создадим с кастомной политикой в 1 попытку, чтобы после MarkFailed перешёл в Dead
             var customRetry = new RetryPolicy(new[] { 60 });
@@ -158,7 +157,7 @@ public class UpdateTaskCommandHandlerNegativeTests
     {
         // Arrange
         var taskId = Guid.NewGuid();
-        var completedTask = CreateTask(taskId, "test-sender", TaskStatus.Completed);
+        var completedTask = CreateTask(taskId, "test-sender", StatusTask.Completed);
         _taskRepoMock.Setup(r => r.GetByIdAsync(TaskId.From(taskId), It.Is<CancellationToken>(ct => ct == _ct)))
             .ReturnsAsync(completedTask);
 

@@ -3,7 +3,6 @@
 using Dapper;
 using Domain.Enums;
 using Domain.ValueObjects;
-using TaskStatus = Domain.Enums.TaskStatus;
 
 namespace Infrastructure.Persistence.TypeHandlers;
 
@@ -24,7 +23,7 @@ public static class DapperTypeHandlerConfig
         SqlMapper.AddTypeHandler(new TaskIdTypeHandler());
 
         // Enums ↔ int
-        SqlMapper.AddTypeHandler(new EnumTypeHandler<TaskStatus>());
+        SqlMapper.AddTypeHandler(new EnumTypeHandler<StatusTask>());
         SqlMapper.AddTypeHandler(new EnumTypeHandler<TaskType>());
         SqlMapper.AddTypeHandler(new EnumTypeHandler<ResultDeliveryMode>());
         

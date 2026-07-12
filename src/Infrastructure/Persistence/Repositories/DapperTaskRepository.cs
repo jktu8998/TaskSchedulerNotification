@@ -10,7 +10,6 @@ using Domain.Enums;
 using Domain.Interfaces;
 using Domain.ValueObjects;
 using Infrastructure.Persistence.TypeHandlers;
-using TaskStatus = Domain.Enums.TaskStatus;
 
 namespace Infrastructure.Persistence.Repositories;
 
@@ -81,7 +80,7 @@ public sealed class DapperTaskRepository : ITaskRepository
     
     public async Task<IReadOnlyList<ScheduledTask>> GetBySenderIdAsync(
         string senderId, int skip, int take,
-        TaskStatus? status = null, TaskType? type = null,
+        StatusTask? status = null, TaskType? type = null,
         CancellationToken ct = default)
     {
         var sql = "SELECT * FROM tasks WHERE sender_id = @SenderId";
@@ -117,7 +116,7 @@ public sealed class DapperTaskRepository : ITaskRepository
 
         var result = await _db.Connection.QueryAsync<ScheduledTask>(sql, new
         {
-            Status = TaskStatus.Scheduled, // EnumTypeHandler преобразует в int
+            Status = StatusTask.Scheduled, // EnumTypeHandler преобразует в int
             Cutoff = cutoff,
             BatchSize = batchSize
         }, transaction: _db.Transaction);
@@ -176,7 +175,7 @@ public sealed class DapperTaskRepository : ITaskRepository
 
         var result = await _db.Connection.QueryAsync<ScheduledTask>(sql, new
         {
-            Status = TaskStatus.Executing,
+            Status = StatusTask.Executing,
             UtcNow = utcNow
         }, transaction: _db.Transaction);
 
@@ -194,7 +193,7 @@ public sealed class DapperTaskRepository : ITaskRepository
 
         return await _db.Connection.QuerySingleOrDefaultAsync<ScheduledTask>(sql, new
         {
-            Status = TaskStatus.Queued
+            Status = StatusTask.Queued
         }, transaction: _db.Transaction);
     }
 }

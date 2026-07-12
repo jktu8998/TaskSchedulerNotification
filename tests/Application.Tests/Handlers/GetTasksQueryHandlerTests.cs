@@ -12,7 +12,6 @@ using Domain.Interfaces;
 using Domain.ValueObjects;
 using Moq;
 using Xunit;
-using TaskStatus = Domain.Enums.TaskStatus;
 
 namespace Application.Tests.Handlers;
 
@@ -30,7 +29,7 @@ public class GetTasksQueryHandlerTests
         _handler = new GetTasksQueryHandler(_taskRepoMock.Object, _requestContextMock.Object);
     }
 
-    private ScheduledTask CreateTask(Guid taskId, string senderId = "test-sender", TaskType type = TaskType.OneTime, TaskStatus status = TaskStatus.Scheduled, int? timeoutSeconds = null)
+    private ScheduledTask CreateTask(Guid taskId, string senderId = "test-sender", TaskType type = TaskType.OneTime, StatusTask status = StatusTask.Scheduled, int? timeoutSeconds = null)
     {
         var task = new ScheduledTask(
             TaskId.From(taskId),
@@ -40,9 +39,9 @@ public class GetTasksQueryHandlerTests
             new ExecutionConfig("GET", "https://api.example.com", timeoutSeconds: timeoutSeconds),
             null, null, RetryPolicy.Default, null,
             _utcNow);
-        if (status == TaskStatus.Scheduled)
+        if (status == StatusTask.Scheduled)
             task.ScheduleTask(_utcNow, _utcNow.AddHours(1));
-        else if (status == TaskStatus.Completed)
+        else if (status == StatusTask.Completed)
         {
             task.ScheduleTask(_utcNow, _utcNow.AddHours(1));
             task.Enqueue(_utcNow);
@@ -85,12 +84,12 @@ public class GetTasksQueryHandlerTests
     public async Task HandleAsync_WithStatusFilter_ParsesAndFilters()
     {
         // Arrange
-        var completedTask = CreateTask(Guid.NewGuid(), "test-sender", TaskType.OneTime, TaskStatus.Completed);
-        var scheduledTask = CreateTask(Guid.NewGuid(), "test-sender", TaskType.OneTime, TaskStatus.Scheduled);
+        var completedTask = CreateTask(Guid.NewGuid(), "test-sender", TaskType.OneTime, StatusTask.Completed);
+        var scheduledTask = CreateTask(Guid.NewGuid(), "test-sender", TaskType.OneTime, StatusTask.Scheduled);
         var allTasks = new List<ScheduledTask> { completedTask, scheduledTask };
 
         _taskRepoMock.Setup(r => r.GetBySenderIdAsync(
-                "test-sender", 0, 10, Domain.Enums.TaskStatus.Completed, null, It.Is<CancellationToken>(ct => ct == _ct)))
+                "test-sender", 0, 10, Domain.Enums.StatusTask.Completed, null, It.Is<CancellationToken>(ct => ct == _ct)))
             .ReturnsAsync(new[] { completedTask });
 
         var query = new GetTasksQuery(0, 10, Status: "Completed");
@@ -107,8 +106,8 @@ public class GetTasksQueryHandlerTests
     public async Task HandleAsync_WithTypeFilter_ParsesAndFilters()
     {
         // Arrange
-        var periodicTask = CreateTask(Guid.NewGuid(), "test-sender", TaskType.Periodic, TaskStatus.Scheduled);
-        var oneTimeTask = CreateTask(Guid.NewGuid(), "test-sender", TaskType.OneTime, TaskStatus.Scheduled);
+        var periodicTask = CreateTask(Guid.NewGuid(), "test-sender", TaskType.Periodic, StatusTask.Scheduled);
+        var oneTimeTask = CreateTask(Guid.NewGuid(), "test-sender", TaskType.OneTime, StatusTask.Scheduled);
         var allTasks = new List<ScheduledTask> { periodicTask, oneTimeTask };
 
         _taskRepoMock.Setup(r => r.GetBySenderIdAsync(
@@ -148,7 +147,7 @@ public class GetTasksQueryHandlerTests
     {
         // Arrange
         _taskRepoMock.Setup(r => r.GetBySenderIdAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>(),
-                It.IsAny<Domain.Enums.TaskStatus?>(), It.IsAny<Domain.Enums.TaskType?>(), It.IsAny<CancellationToken>()))
+                It.IsAny<Domain.Enums.StatusTask?>(), It.IsAny<Domain.Enums.TaskType?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<ScheduledTask>());
 
         var query = new GetTasksQuery(0, 10);

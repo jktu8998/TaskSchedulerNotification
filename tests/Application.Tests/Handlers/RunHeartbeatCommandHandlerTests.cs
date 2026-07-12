@@ -11,7 +11,6 @@ using Domain.Interfaces;
 using Domain.ValueObjects;
 using Moq;
 using Xunit;
-using TaskStatus = Domain.Enums.TaskStatus;
 
 namespace Application.Tests.Handlers;
 
@@ -108,7 +107,7 @@ public class RunHeartbeatCommandHandlerTests
 
         // Assert
         Assert.NotNull(capturedTask);
-        Assert.Equal(TaskStatus.Scheduled, capturedTask.Status); // Failed -> Scheduled через ScheduleRetry
+        Assert.Equal(StatusTask.Scheduled, capturedTask.Status); // Failed -> Scheduled через ScheduleRetry
         // Базовый интервал 60 сек + Jitter 5 сек = 65 сек
         var expectedRetryTime = _utcNow.AddSeconds(65);
         Assert.Equal(expectedRetryTime, capturedTask.NextExecutionAt);
@@ -136,7 +135,7 @@ public class RunHeartbeatCommandHandlerTests
 
         // Assert
         Assert.NotNull(capturedTask);
-        Assert.Equal(TaskStatus.Dead, capturedTask.Status);
+        Assert.Equal(StatusTask.Dead, capturedTask.Status);
         _dlqRepoMock.Verify(d => d.AddAsync(It.IsAny<DeadLetterEntry>(), It.Is<CancellationToken>(ct => ct == _ct)), Times.Once);
     }
 

@@ -8,7 +8,6 @@ using Domain.Entities;
 using Domain.Enums;
 using Domain.Interfaces;
 using Domain.ValueObjects;
-using TaskStatus = Domain.Enums.TaskStatus;
 
 namespace Application.Handlers;
 
@@ -63,7 +62,7 @@ public sealed class RunExecutionCommandHandler : ICommandHandler<RunExecutionCom
 
         // Загружаем задание
         var task = await _taskRepo.GetByIdAsync(taskId, cancellationToken);
-        if (task == null || task.Status != TaskStatus.Queued)
+        if (task == null || task.Status != StatusTask.Queued)
             return; // игнорируем дубликаты или неактуальные сообщения
 
         // ====== ФАЗА 1: Захват (быстрая транзакция) ======
@@ -112,7 +111,7 @@ public sealed class RunExecutionCommandHandler : ICommandHandler<RunExecutionCom
         // ====== ФАЗА 3: Фиксация результата (новая быстрая транзакция) ======
         // Перезагружаем задание, чтобы иметь актуальное состояние (хотя LockedUntil не истёк, но для надёжности)
         task = await _taskRepo.GetByIdAsync(taskId, cancellationToken);
-        if (task == null || task.Status != TaskStatus.Executing)
+        if (task == null || task.Status != StatusTask.Executing)
         {
             // Задание кто-то перехватил (heartbeat) или отменил — игнорируем
             return;
@@ -140,7 +139,7 @@ public sealed class RunExecutionCommandHandler : ICommandHandler<RunExecutionCom
                 // Неудача
                 task.MarkFailed(utcNow, response.Body ?? "Unknown error");
 
-                if (task.Status == TaskStatus.Failed)
+                if (task.Status == StatusTask.Failed)
                 {
                     var attemptIndex = task.CurrentAttempt - 1;
                     // Базовый интервал из RetryPolicy
@@ -154,7 +153,7 @@ public sealed class RunExecutionCommandHandler : ICommandHandler<RunExecutionCom
                     var nextRetryAt = utcNow + jitteredInterval;
                     task.ScheduleRetry(utcNow, nextRetryAt);
                 }
-                else if (task.Status == TaskStatus.Dead)
+                else if (task.Status == StatusTask.Dead)
                 {
                     // Попытки исчерпаны — сохраняем в DLQ
                     var snapshot = JsonSerializer.Serialize(task);

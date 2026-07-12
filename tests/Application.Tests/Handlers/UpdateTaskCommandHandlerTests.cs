@@ -13,7 +13,6 @@ using Domain.Interfaces;
 using Domain.ValueObjects;
 using Moq;
 using Xunit;
-using TaskStatus = Domain.Enums.TaskStatus;
 
 namespace Application.Tests.Handlers;
 
@@ -104,7 +103,7 @@ public class UpdateTaskCommandHandlerTests
         // Старое задание отменено
         Assert.NotNull(capturedOldTask);
         Assert.Equal(oldTaskId, capturedOldTask.Id.Value);
-        Assert.Equal(TaskStatus.Cancelled, capturedOldTask.Status);
+        Assert.Equal(StatusTask.Cancelled, capturedOldTask.Status);
 
         // Новое задание создано с обновлёнными полями
         Assert.NotNull(capturedNewTask);

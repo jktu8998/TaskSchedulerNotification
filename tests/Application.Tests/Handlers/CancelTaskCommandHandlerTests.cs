@@ -12,7 +12,6 @@ using Domain.Interfaces;
 using Domain.ValueObjects;
 using Moq;
 using Xunit;
-using TaskStatus = Domain.Enums.TaskStatus;
 
 namespace Application.Tests.Handlers;
 
@@ -41,7 +40,7 @@ public class CancelTaskCommandHandlerTests
         );
     }
 
-    private ScheduledTask CreateTask(Guid taskId, string senderId = "test-sender", TaskStatus status = TaskStatus.Scheduled)
+    private ScheduledTask CreateTask(Guid taskId, string senderId = "test-sender", StatusTask status = StatusTask.Scheduled)
     {
         var task = new ScheduledTask(
             TaskId.From(taskId),
@@ -52,7 +51,7 @@ public class CancelTaskCommandHandlerTests
             null, null, null, null,
             _utcNow);
 
-        if (status == TaskStatus.Scheduled)
+        if (status == StatusTask.Scheduled)
         {
             task.ScheduleTask(_utcNow, _utcNow.AddHours(1));
         }
@@ -67,7 +66,7 @@ public class CancelTaskCommandHandlerTests
     {
         // Arrange
         var taskId = Guid.NewGuid();
-        var scheduledTask = CreateTask(taskId, "test-sender", TaskStatus.Scheduled);
+        var scheduledTask = CreateTask(taskId, "test-sender", StatusTask.Scheduled);
         _taskRepoMock
             .Setup(r => r.GetByIdAsync(TaskId.From(taskId), It.Is<CancellationToken>(ct => ct == _ct)))
             .ReturnsAsync(scheduledTask);
@@ -86,7 +85,7 @@ public class CancelTaskCommandHandlerTests
         // Assert
         Assert.NotNull(capturedTask);
         Assert.Equal(taskId, capturedTask.Id.Value);
-        Assert.Equal(TaskStatus.Cancelled, capturedTask.Status);
+        Assert.Equal(StatusTask.Cancelled, capturedTask.Status);
         Assert.Null(capturedTask.LockedUntil); // не должно быть блокировки
 
         // Транзакция: начали, коммит
@@ -103,11 +102,11 @@ public class CancelTaskCommandHandlerTests
     {
         // Arrange: задание в статусе Executing (с блокировкой)
         var taskId = Guid.NewGuid();
-        var task = CreateTask(taskId, "test-sender", TaskStatus.Scheduled);
+        var task = CreateTask(taskId, "test-sender", StatusTask.Scheduled);
         // Переводим в Executing
         task.Enqueue(_utcNow);
         task.StartExecution(_utcNow, TimeSpan.FromSeconds(30));
-        Assert.Equal(TaskStatus.Executing, task.Status);
+        Assert.Equal(StatusTask.Executing, task.Status);
         Assert.NotNull(task.LockedUntil);
 
         _taskRepoMock
@@ -127,7 +126,7 @@ public class CancelTaskCommandHandlerTests
 
         // Assert
         Assert.NotNull(capturedTask);
-        Assert.Equal(TaskStatus.Cancelled, capturedTask.Status);
+        Assert.Equal(StatusTask.Cancelled, capturedTask.Status);
         Assert.Null(capturedTask.LockedUntil); // блокировка сброшена
     }
     
@@ -158,7 +157,7 @@ public class CancelTaskCommandHandlerTests
     {
         // Arrange
         var taskId = Guid.NewGuid();
-        var task = CreateTask(taskId, "other-sender", TaskStatus.Scheduled); // другой отправитель
+        var task = CreateTask(taskId, "other-sender", StatusTask.Scheduled); // другой отправитель
         _taskRepoMock.Setup(r => r.GetByIdAsync(TaskId.From(taskId), It.Is<CancellationToken>(ct => ct == _ct)))
             .ReturnsAsync(task);
     
@@ -175,11 +174,11 @@ public class CancelTaskCommandHandlerTests
     {
         // Arrange: задание в Completed
         var taskId = Guid.NewGuid();
-        var task = CreateTask(taskId, "test-sender", TaskStatus.Scheduled);
+        var task = CreateTask(taskId, "test-sender", StatusTask.Scheduled);
         task.Enqueue(_utcNow);
         task.StartExecution(_utcNow, TimeSpan.FromSeconds(30));
         task.CompleteSuccessfully(_utcNow);
-        Assert.Equal(TaskStatus.Completed, task.Status);
+        Assert.Equal(StatusTask.Completed, task.Status);
 
         _taskRepoMock.Setup(r => r.GetByIdAsync(TaskId.From(taskId), It.Is<CancellationToken>(ct => ct == _ct)))
             .ReturnsAsync(task);
@@ -201,7 +200,7 @@ public class CancelTaskCommandHandlerTests
     {
         // Arrange
         var taskId = Guid.NewGuid();
-        var task = CreateTask(taskId, "test-sender", TaskStatus.Scheduled);
+        var task = CreateTask(taskId, "test-sender", StatusTask.Scheduled);
         _taskRepoMock.Setup(r => r.GetByIdAsync(TaskId.From(taskId), It.Is<CancellationToken>(ct => ct == _ct)))
             .ReturnsAsync(task);
     

@@ -6,8 +6,6 @@ using Domain.ValueObjects;
 using Xunit;
 using FluentAssertions;
 
-using TaskStatus = Domain.Enums.TaskStatus;
-
 namespace Domain.Tests.Entities;
 
 public class ScheduledTaskTests
@@ -32,7 +30,7 @@ public class ScheduledTaskTests
         Assert.Equal(taskId, task.Id);
         Assert.Equal(senderId, task.SenderId);
         Assert.Equal(TaskType.OneTime, task.Type);
-        Assert.Equal(TaskStatus.Created, task.Status);
+        Assert.Equal(StatusTask.Created, task.Status);
 
         // Schedule — record с простыми полями, сравнение по значению сработает
         Assert.Equal(schedule, task.Schedule);
@@ -70,7 +68,7 @@ public class ScheduledTaskTests
         task.ScheduleTask(scheduledTime, scheduledTime);
 
         // Assert
-        task.Status.Should().Be(TaskStatus.Scheduled);
+        task.Status.Should().Be(StatusTask.Scheduled);
         task.NextExecutionAt.Should().Be(scheduledTime);
         task.DomainEvents.Should().ContainSingle(e => e is TaskScheduledEvent);
     }
@@ -102,7 +100,7 @@ public class ScheduledTaskTests
         task.Enqueue(utcNow);
 
         // Assert
-        task.Status.Should().Be(TaskStatus.Queued);
+        task.Status.Should().Be(StatusTask.Queued);
         task.UpdatedAt.Should().Be(utcNow);
         task.DomainEvents.Should().ContainSingle(e => e is TaskQueuedEvent);
     }
@@ -186,7 +184,7 @@ public class ScheduledTaskTests
         task.StartExecution(utcNow, lockDuration);
 
         // Assert
-        task.Status.Should().Be(TaskStatus.Executing);
+        task.Status.Should().Be(StatusTask.Executing);
         task.LockedUntil.Should().Be(utcNow + lockDuration);
         task.UpdatedAt.Should().Be(utcNow);
         task.DomainEvents.Should().ContainSingle(e => e is TaskExecutionStartedEvent);
@@ -222,7 +220,7 @@ public class ScheduledTaskTests
         task.CompleteSuccessfully(utcNow);
 
         // Assert
-        task.Status.Should().Be(TaskStatus.Completed);
+        task.Status.Should().Be(StatusTask.Completed);
         task.LockedUntil.Should().BeNull();
         task.UpdatedAt.Should().Be(utcNow);
         task.DomainEvents.Should().ContainSingle(e => e is TaskCompletedEvent);
@@ -276,7 +274,7 @@ public class ScheduledTaskTests
         task.MarkFailed(utcNow, "Test error");
 
         // Assert
-        task.Status.Should().Be(TaskStatus.Failed);
+        task.Status.Should().Be(StatusTask.Failed);
         task.CurrentAttempt.Should().Be(1); // было 0, стало 1
         task.LockedUntil.Should().BeNull(); // блокировка снята
         task.UpdatedAt.Should().Be(utcNow);
@@ -299,7 +297,7 @@ public class ScheduledTaskTests
         }
 
         // Assert
-        task.Status.Should().Be(TaskStatus.Dead);
+        task.Status.Should().Be(StatusTask.Dead);
         task.CurrentAttempt.Should().Be(RetryPolicy.Default.MaxAttempts); // 5
         task.LockedUntil.Should().BeNull();
         task.UpdatedAt.Should().Be(utcNow);
@@ -328,7 +326,7 @@ public class ScheduledTaskTests
         task.MarkFailed(utcNow, "Error");
 
         // Assert после первого падения
-        task.Status.Should().Be(TaskStatus.Failed);
+        task.Status.Should().Be(StatusTask.Failed);
         task.CurrentAttempt.Should().Be(1);
 
         // Ретрай: переводим обратно в Scheduled -> Queued -> Executing
@@ -340,7 +338,7 @@ public class ScheduledTaskTests
         task.MarkFailed(utcNow, "Error");
 
         // Assert
-        task.Status.Should().Be(TaskStatus.Dead);
+        task.Status.Should().Be(StatusTask.Dead);
         task.CurrentAttempt.Should().Be(2); // обе попытки использованы
         task.LockedUntil.Should().BeNull();
         task.UpdatedAt.Should().Be(utcNow);
@@ -359,7 +357,7 @@ public class ScheduledTaskTests
         task.Pause(utcNow);
 
         // Assert
-        task.Status.Should().Be(TaskStatus.Paused);
+        task.Status.Should().Be(StatusTask.Paused);
         task.UpdatedAt.Should().Be(utcNow);
         task.DomainEvents.Should().ContainSingle(e => e is TaskPausedEvent);
     }
@@ -389,7 +387,7 @@ public class ScheduledTaskTests
         task.Resume(utcNow);
 
         // Assert
-        task.Status.Should().Be(TaskStatus.Scheduled);
+        task.Status.Should().Be(StatusTask.Scheduled);
         task.UpdatedAt.Should().Be(utcNow);
         task.DomainEvents.Should().ContainSingle(e => e is TaskResumedEvent);
     }
@@ -422,7 +420,7 @@ public class ScheduledTaskTests
         task.Cancel(utcNow);
 
         // Assert
-        task.Status.Should().Be(TaskStatus.Cancelled);
+        task.Status.Should().Be(StatusTask.Cancelled);
         task.UpdatedAt.Should().Be(utcNow);
         task.DomainEvents.Should().ContainSingle(e => e is TaskCancelledEvent);
     }

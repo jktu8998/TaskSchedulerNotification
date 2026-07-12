@@ -4,7 +4,6 @@ using System.Threading.Tasks;
 using Domain.Entities;
 using Domain.Enums;
 using Domain.ValueObjects;
-using TaskStatus = Domain.Enums.TaskStatus;
 
 namespace Domain.Interfaces;
 
@@ -26,7 +25,7 @@ public interface ITaskRepository
     /// </summary>
     Task<IReadOnlyList<ScheduledTask>> GetBySenderIdAsync(
         string senderId, int skip, int take, 
-        TaskStatus? status = null, TaskType? type = null, 
+        StatusTask? status = null, TaskType? type = null, 
         CancellationToken cancellationToken = default);
 
     /// <summary>

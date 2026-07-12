@@ -2,7 +2,6 @@
 using Domain.Enums;
 using Domain.ValueObjects;
 using Domain.DomainEvents;
-using TaskStatus = Domain.Enums.TaskStatus;
 
 namespace Domain.Entities;
 
@@ -17,7 +16,7 @@ public sealed class ScheduledTask
     public TaskId Id { get; private set; }
     public string SenderId { get; private set; }
     public TaskType Type { get; private set; }
-    public TaskStatus Status { get; private set; }
+    public StatusTask Status { get; private set; }
     public Schedule Schedule { get; private set; }
     public ExecutionConfig Execution { get; private set; }
     public ResultDeliveryConfig? ResultDelivery { get; private set; }
@@ -77,7 +76,7 @@ public sealed class ScheduledTask
         Id = id;
         SenderId = senderId;
         Type = type;
-        Status = TaskStatus.Created;
+        Status = StatusTask.Created;
         Schedule = schedule;
         Execution = execution;
         ResultDelivery = resultDelivery;
@@ -102,10 +101,10 @@ public sealed class ScheduledTask
     /// <param name="nextExecutionAt">Абсолютное время ближайшего запуска.</param>
     public void ScheduleTask(DateTime utcNow, DateTime nextExecutionAt)
     {
-        if (Status != TaskStatus.Created)
+        if (Status != StatusTask.Created)
             throw new InvalidOperationException($"Cannot schedule task in status {Status}");
     
-        Status = TaskStatus.Scheduled;
+        Status = StatusTask.Scheduled;
         NextExecutionAt = nextExecutionAt;
         UpdatedAt = utcNow;
         _domainEvents.Add(new TaskScheduledEvent(Id));
@@ -116,9 +115,9 @@ public sealed class ScheduledTask
     /// </summary>
     public void Enqueue(DateTime utcNow)
     {
-        if (Status != TaskStatus.Scheduled)
+        if (Status != StatusTask.Scheduled)
             throw new InvalidOperationException($"Cannot enqueue task in status {Status}");
-        Status = TaskStatus.Queued;
+        Status = StatusTask.Queued;
         UpdatedAt = utcNow;
         _domainEvents.Add(new TaskQueuedEvent(Id));
     }
@@ -131,9 +130,9 @@ public sealed class ScheduledTask
     /// <param name="lockDuration">На какое время заблокировать задачу (обычно таймаут выполнения).</param>
     public void StartExecution(DateTime utcNow, TimeSpan lockDuration)
     {
-        if (Status != TaskStatus.Queued)
+        if (Status != StatusTask.Queued)
             throw new InvalidOperationException($"Cannot start execution in status {Status}");
-        Status = TaskStatus.Executing;
+        Status = StatusTask.Executing;
         UpdatedAt = utcNow;
         LockedUntil = utcNow + lockDuration;
         _domainEvents.Add(new TaskExecutionStartedEvent(Id));
@@ -144,9 +143,9 @@ public sealed class ScheduledTask
     /// </summary>
     public void CompleteSuccessfully(DateTime utcNow)
     {
-        if (Status != TaskStatus.Executing)
+        if (Status != StatusTask.Executing)
             throw new InvalidOperationException($"Cannot complete task in status {Status}");
-        Status = TaskStatus.Completed;
+        Status = StatusTask.Completed;
         UpdatedAt = utcNow;
         LockedUntil = null; // больше не заблокировано
         _domainEvents.Add(new TaskCompletedEvent(Id));
@@ -161,19 +160,19 @@ public sealed class ScheduledTask
     /// <param name="errorDetails">Детали ошибки (опционально, для логирования).</param>
     public void MarkFailed(DateTime utcNow, string? errorDetails = null)
     {
-        if (Status != TaskStatus.Executing)
+        if (Status != StatusTask.Executing)
             throw new InvalidOperationException($"Cannot fail task in status {Status}");
 
         CurrentAttempt++; // Инкремент попыток внутри агрегата
 
         if (CurrentAttempt >= RetryPolicy.MaxAttempts)
         {
-            Status = TaskStatus.Dead;
+            Status = StatusTask.Dead;
             _domainEvents.Add(new TaskMovedToDlqEvent(Id));
         }
         else
         {
-            Status = TaskStatus.Failed;
+            Status = StatusTask.Failed;
             _domainEvents.Add(new TaskFailedEvent(Id));
         }
 
@@ -186,9 +185,9 @@ public sealed class ScheduledTask
     /// </summary>
     public void Pause(DateTime utcNow)
     {
-        if (Status != TaskStatus.Scheduled)
+        if (Status != StatusTask.Scheduled)
             throw new InvalidOperationException($"Cannot pause task in status {Status}");
-        Status = TaskStatus.Paused;
+        Status = StatusTask.Paused;
         UpdatedAt = utcNow;
         _domainEvents.Add(new TaskPausedEvent(Id));
     }
@@ -198,9 +197,9 @@ public sealed class ScheduledTask
     /// </summary>
     public void Resume(DateTime utcNow)
     {
-        if (Status != TaskStatus.Paused)
+        if (Status != StatusTask.Paused)
             throw new InvalidOperationException($"Cannot resume task in status {Status}");
-        Status = TaskStatus.Scheduled;
+        Status = StatusTask.Scheduled;
         UpdatedAt = utcNow;
         _domainEvents.Add(new TaskResumedEvent(Id));
     }
@@ -211,9 +210,9 @@ public sealed class ScheduledTask
     /// </summary>
     public void Cancel(DateTime utcNow)
     {
-        if (Status == TaskStatus.Completed || Status == TaskStatus.Dead || Status == TaskStatus.Cancelled)
+        if (Status == StatusTask.Completed || Status == StatusTask.Dead || Status == StatusTask.Cancelled)
             throw new InvalidOperationException($"Cannot cancel task in final status {Status}");
-        Status = TaskStatus.Cancelled;
+        Status = StatusTask.Cancelled;
         UpdatedAt = utcNow;
         LockedUntil = null;
         _domainEvents.Add(new TaskCancelledEvent(Id));
@@ -227,10 +226,10 @@ public sealed class ScheduledTask
     /// <param name="nextExecutionAt">Абсолютное время следующего запуска.</param>
     public void Reschedule(DateTime utcNow, DateTime nextExecutionAt)
     {
-        if (Status != TaskStatus.Executing)
+        if (Status != StatusTask.Executing)
             throw new InvalidOperationException($"Cannot reschedule task in status {Status}");
     
-        Status = TaskStatus.Scheduled;
+        Status = StatusTask.Scheduled;
         NextExecutionAt = nextExecutionAt;
         UpdatedAt = utcNow;
         LockedUntil = null;
@@ -247,10 +246,10 @@ public sealed class ScheduledTask
     /// <param name="nextExecutionAt">Абсолютное время следующей попытки (utcNow + интервал из RetryPolicy).</param>
     public void ScheduleRetry(DateTime utcNow, DateTime nextExecutionAt)
     {
-        if (Status != TaskStatus.Failed)
+        if (Status != StatusTask.Failed)
             throw new InvalidOperationException($"Cannot schedule retry in status {Status}");
 
-        Status = TaskStatus.Scheduled;
+        Status = StatusTask.Scheduled;
         NextExecutionAt = nextExecutionAt;
         UpdatedAt = utcNow;
         LockedUntil = null; // разблокируем задачу, она больше не в Executing

@@ -9,7 +9,6 @@ using Application.Queries;
 using Domain.Entities;
 using Domain.Enums;
 using Domain.Interfaces;
-using TaskStatus = Domain.Enums.TaskStatus;
 
 namespace Application.Handlers;
 
@@ -31,8 +30,8 @@ public sealed class GetTasksQueryHandler : IQueryHandler<GetTasksQuery, IReadOnl
 
     public async Task<IReadOnlyList<TaskResponse>> HandleAsync(GetTasksQuery query, CancellationToken cancellationToken = default)
     {
-        TaskStatus? statusFilter = null;
-        if (!string.IsNullOrWhiteSpace(query.Status) && Enum.TryParse<TaskStatus>(query.Status, ignoreCase: true, out var parsedStatus))
+        StatusTask? statusFilter = null;
+        if (!string.IsNullOrWhiteSpace(query.Status) && Enum.TryParse<StatusTask>(query.Status, ignoreCase: true, out var parsedStatus))
             statusFilter = parsedStatus;
 
         TaskType? typeFilter = null;

@@ -12,7 +12,6 @@ using Domain.Interfaces;
 using Domain.ValueObjects;
 using Moq;
 using Xunit;
-using TaskStatus = Domain.Enums.TaskStatus;
 
 namespace Application.Tests.Handlers;
 
@@ -41,7 +40,7 @@ public class PauseTaskCommandHandlerTests
         );
     }
 
-    private ScheduledTask CreateTask(Guid taskId, string senderId = "test-sender", TaskStatus status = TaskStatus.Scheduled)
+    private ScheduledTask CreateTask(Guid taskId, string senderId = "test-sender", StatusTask status = StatusTask.Scheduled)
     {
         var task = new ScheduledTask(
             TaskId.From(taskId),
@@ -52,7 +51,7 @@ public class PauseTaskCommandHandlerTests
             null, null, null, null,
             _utcNow);
 
-        if (status == TaskStatus.Scheduled)
+        if (status == StatusTask.Scheduled)
         {
             task.ScheduleTask(_utcNow, _utcNow.AddHours(1));
         }
@@ -66,7 +65,7 @@ public class PauseTaskCommandHandlerTests
     {
         // Arrange
         var taskId = Guid.NewGuid();
-        var task = CreateTask(taskId, "test-sender", TaskStatus.Scheduled);
+        var task = CreateTask(taskId, "test-sender", StatusTask.Scheduled);
         _taskRepoMock
             .Setup(r => r.GetByIdAsync(TaskId.From(taskId), It.Is<CancellationToken>(ct => ct == _ct)))
             .ReturnsAsync(task);
@@ -85,7 +84,7 @@ public class PauseTaskCommandHandlerTests
         // Assert
         Assert.NotNull(capturedTask);
         Assert.Equal(taskId, capturedTask.Id.Value);
-        Assert.Equal(TaskStatus.Paused, capturedTask.Status);
+        Assert.Equal(StatusTask.Paused, capturedTask.Status);
 
         _unitOfWorkMock.Verify(u => u.BeginTransactionAsync(It.Is<CancellationToken>(ct => ct == _ct)), Times.Once);
         _unitOfWorkMock.Verify(u => u.CommitAsync(It.Is<CancellationToken>(ct => ct == _ct)), Times.Once);
@@ -118,7 +117,7 @@ public class PauseTaskCommandHandlerTests
     {
         // Arrange
         var taskId = Guid.NewGuid();
-        var task = CreateTask(taskId, "other-sender", TaskStatus.Scheduled);
+        var task = CreateTask(taskId, "other-sender", StatusTask.Scheduled);
         _taskRepoMock.Setup(r => r.GetByIdAsync(TaskId.From(taskId), It.Is<CancellationToken>(ct => ct == _ct)))
             .ReturnsAsync(task);
 
@@ -135,7 +134,7 @@ public class PauseTaskCommandHandlerTests
     {
         // Arrange: задание в Created (не Scheduled)
         var taskId = Guid.NewGuid();
-        var task = CreateTask(taskId, "test-sender", TaskStatus.Created); // статус Created
+        var task = CreateTask(taskId, "test-sender", StatusTask.Created); // статус Created
         _taskRepoMock.Setup(r => r.GetByIdAsync(TaskId.From(taskId), It.Is<CancellationToken>(ct => ct == _ct)))
             .ReturnsAsync(task);
 
@@ -156,7 +155,7 @@ public class PauseTaskCommandHandlerTests
     {
         // Arrange
         var taskId = Guid.NewGuid();
-        var task = CreateTask(taskId, "test-sender", TaskStatus.Scheduled);
+        var task = CreateTask(taskId, "test-sender", StatusTask.Scheduled);
         _taskRepoMock.Setup(r => r.GetByIdAsync(TaskId.From(taskId), It.Is<CancellationToken>(ct => ct == _ct)))
             .ReturnsAsync(task);
 

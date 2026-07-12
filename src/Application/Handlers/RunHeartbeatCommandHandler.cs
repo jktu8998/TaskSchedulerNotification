@@ -7,7 +7,8 @@ using Domain.Entities;
 using Domain.Enums;
 using Domain.Interfaces;
 using Newtonsoft.Json;
-using TaskStatus = Domain.Enums.TaskStatus; // Используем то, что выбрали ранее для DLQ
+
+// Используем то, что выбрали ранее для DLQ
 
 namespace Application.Handlers;
 
@@ -60,7 +61,7 @@ public sealed class RunHeartbeatCommandHandler : ICommandHandler<RunHeartbeatCom
                 // Помечаем как упавшую. Домен сам инкрементит попытки и решит: Failed или Dead.
                 task.MarkFailed(utcNow, "Execution timed out (recovered by Heartbeat)");
 
-                if (task.Status == TaskStatus.Failed)
+                if (task.Status == StatusTask.Failed)
                 {
                     // Вычисляем время следующей попытки и переводим в Scheduled
                     var attemptIndex = task.CurrentAttempt - 1;
@@ -73,7 +74,7 @@ public sealed class RunHeartbeatCommandHandler : ICommandHandler<RunHeartbeatCom
                     var nextRetryAt = utcNow + jitteredInterval;
                     task.ScheduleRetry(utcNow, nextRetryAt);
                 }
-                else if (task.Status == TaskStatus.Dead)
+                else if (task.Status == StatusTask.Dead)
                 {
                     // Все попытки исчерпаны — сохраняем в DLQ
                     // Не забываем передать SenderId в конструктор DLQ (как мы обсудили ранее!)
