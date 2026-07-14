@@ -45,23 +45,23 @@ public sealed record HttpExecutionConfig : ExecutionStrategy
                 throw new ArgumentException("Header keys cannot be null or empty.", nameof(headers));
         }
 
-        Method = method.ToUpperInvariant();
-        Url = url;
-        Headers = headerDict.ToImmutableDictionary(StringComparer.Ordinal);
-        Body = body;
-
         // Body должен быть валидным JSON, если не null
         if (!string.IsNullOrWhiteSpace(body))
         {
             try
             {
-                System.Text.Json.JsonDocument.Parse(body);
+                // Проверяем, что Body валидный JSON, и немедленно освобождаем буфер из ArrayPool
+                using var doc = System.Text.Json.JsonDocument.Parse(body);
             }
             catch (System.Text.Json.JsonException ex)
             {
                 throw new ArgumentException("Body must be a valid JSON string.", nameof(body), ex);
             }
         }
+        Method = method.ToUpperInvariant();
+        Url = url;
+        Headers = headerDict.ToImmutableDictionary(StringComparer.Ordinal);
+        Body = body;
     }
 
     // Пустой конструктор для Dapper/десериализации

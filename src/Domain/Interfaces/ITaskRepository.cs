@@ -51,4 +51,12 @@ public interface ITaskRepository
     /// Реализуется через SELECT FOR UPDATE SKIP LOCKED.
     /// </summary>
     Task<ScheduledTask?> AcquireNextQueuedAsync( CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// Пакетное обновление заданий (статус, время блокировки и т.д.) в одной транзакции.
+    /// Реализация использует UNNEST или несколько команд в одном соединении.
+    /// </summary>
+    /// <param name="tasks">Коллекция заданий с изменённым состоянием.</param>
+    /// <param name="ct">Токен отмены.</param>
+    Task BulkUpdateAsync(IReadOnlyCollection<ScheduledTask> tasks, CancellationToken ct = default);
 }

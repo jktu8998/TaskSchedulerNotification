@@ -39,7 +39,7 @@ public sealed record TaskMetadata
     }
 
     // Структурное равенство
-    public bool Equals(TaskMetadata? other)
+    public   bool Equals(TaskMetadata? other)
     {
         if (other is null) return false;
         if (ReferenceEquals(this, other)) return true;

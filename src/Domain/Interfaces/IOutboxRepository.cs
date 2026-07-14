@@ -34,4 +34,12 @@ public interface IOutboxRepository
     /// <param name="outboxMessageId">Идентификатор записи в Outbox.</param>
     /// <param name="cancellationToken">Токен отмены.</param>
     Task RemoveAsync(Guid outboxMessageId, CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// Пакетная вставка сообщений в Outbox в одной транзакции.
+    /// Реализация использует INSERT ... SELECT UNNEST или аналогичный batch-метод.
+    /// </summary>
+    /// <param name="messages">Коллекция новых сообщений для вставки.</param>
+    /// <param name="ct">Токен отмены.</param>
+    Task BulkAddAsync(IReadOnlyCollection<OutboxMessage> messages, CancellationToken ct = default);
 }
