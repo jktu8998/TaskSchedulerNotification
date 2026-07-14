@@ -18,7 +18,7 @@ public sealed class ScheduledTask
     public TaskType Type { get; private set; }
     public StatusTask Status { get; private set; }
     public Schedule Schedule { get; private set; }
-    public ExecutionConfig Execution { get; private set; }
+    public ExecutionStrategy Strategy { get; private set; }
     public ResultDeliveryConfig? ResultDelivery { get; private set; }
     public PollingConfig? PollingConfig { get; private set; }
     public RetryPolicy RetryPolicy { get; private set; }
@@ -74,7 +74,7 @@ public sealed class ScheduledTask
         SenderId senderId,
         TaskType type,
         Schedule schedule,
-        ExecutionConfig execution,
+        ExecutionStrategy strategy,
         ResultDeliveryConfig? resultDelivery,
         PollingConfig? pollingConfig,
         RetryPolicy? retryPolicy,
@@ -93,14 +93,15 @@ public sealed class ScheduledTask
         // Остальные обязательные параметры
         if (schedule is null)
             throw new ArgumentNullException(nameof(schedule));
-        if (execution is null)
-            throw new ArgumentNullException(nameof(execution));
+        if (strategy is null)
+            throw new ArgumentNullException(nameof(strategy));
+
         Id = id;
         SenderId = senderId;
         Type = type;
         Status = StatusTask.Created;
         Schedule = schedule;
-        Execution = execution;
+        Strategy = strategy;
         ResultDelivery = resultDelivery;
         PollingConfig = pollingConfig;
         RetryPolicy = retryPolicy ?? RetryPolicy.Default;
