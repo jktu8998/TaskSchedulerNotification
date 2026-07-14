@@ -1,4 +1,3 @@
-using Domain.Entities;
 using Domain.ValueObjects;
 
 namespace Domain.DomainEvents;
@@ -9,4 +8,7 @@ namespace Domain.DomainEvents;
 /// Содержит только идентификатор задания.
 /// Остальные данные при необходимости запрашиваются из хранилища.
 /// </summary>
-public sealed record TaskCreatedEvent(TaskId TaskId) : IDomainEvent;
+public sealed record TaskCreatedEvent(TaskId TaskId) : IDomainEvent
+{
+    public bool IsIntermediate => false; // значимое событие
+}

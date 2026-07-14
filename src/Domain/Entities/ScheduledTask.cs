@@ -143,6 +143,18 @@ public sealed class ScheduledTask
         UpdatedAt = utcNow;
         _domainEvents.Add(new TaskQueuedEvent(Id));
     }
+    /// <summary>
+    /// Проверяет, не протухло ли задание (зависло в статусе Executing).
+    /// Возвращает причину протухания или NotStale.
+    /// </summary>
+    /// <param name="utcNow">Текущее время в UTC.</param>
+    public StaleReason IsStale(DateTime utcNow)
+    {
+        if (Status == StatusTask.Executing && LockedUntil <= utcNow)
+            return StaleReason.LockExpired;
+
+        return StaleReason.NotStale;
+    }
 
     /// <summary>
     /// Начинает выполнение задания. Задание блокируется на время lockDuration,
@@ -190,12 +202,12 @@ public sealed class ScheduledTask
         if (CurrentAttempt >= RetryPolicy.MaxAttempts)
         {
             Status = StatusTask.Dead;
-            _domainEvents.Add(new TaskMovedToDlqEvent(Id));
+            _domainEvents.Add(new TaskMovedToDlqEvent(Id));// IsIntermediate = false
         }
         else
         {
             Status = StatusTask.Failed;
-            _domainEvents.Add(new TaskFailedEvent(Id));
+            _domainEvents.Add(new TaskFailedEvent(Id, isIntermediate: true));// промежуточное событие
         }
 
         UpdatedAt = utcNow;
