@@ -51,6 +51,7 @@ public sealed class ScheduledTask
     public IReadOnlyCollection<IDomainEvent> DomainEvents => _domainEvents.AsReadOnly();
     
     public int CurrentAttempt { get; private set; }
+    public TaskMetadata Metadata { get; private set; }
 
     // Пустой конструктор для маппинга из БД (Dapper)
     private ScheduledTask() { }
@@ -78,7 +79,8 @@ public sealed class ScheduledTask
         PollingConfig? pollingConfig,
         RetryPolicy? retryPolicy,
         string? encryptedSensitiveData,
-        DateTime utcNow)
+        DateTime utcNow,
+        TaskMetadata? metadata = null)
     {
         // Конструктор SenderId(string) гарантирует непустоту, так что достаточно проверки на default.
         if (senderId == default)
@@ -111,6 +113,7 @@ public sealed class ScheduledTask
         Version = 1; // Начальная версия агрегата
         // событие теперь содержит только TaskId
         _domainEvents.Add(new TaskCreatedEvent(Id));
+        Metadata = metadata ?? TaskMetadata.Empty;
     }
 
     // ========== Методы переходов статусов ==========
