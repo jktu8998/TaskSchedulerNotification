@@ -3,12 +3,10 @@ using Domain.ValueObjects;
 
 namespace Domain.DomainEvents;
 
+
 /// <summary>
 /// Событие: новое задание создано.
-/// Содержит полный объект задания для обработчиков.
+/// Содержит только идентификатор задания.
+/// Остальные данные при необходимости запрашиваются из хранилища.
 /// </summary>
-public sealed record TaskCreatedEvent(ScheduledTask Task) : IDomainEvent
-{
-    // Явная реализация, требуемая интерфейсом
-    public TaskId TaskId => Task.Id;
-}
+public sealed record TaskCreatedEvent(TaskId TaskId) : IDomainEvent;

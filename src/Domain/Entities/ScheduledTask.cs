@@ -38,6 +38,13 @@ public sealed class ScheduledTask
     /// null, если задача не в статусе Executing.
     /// </summary>
     public DateTime? LockedUntil { get; private set; }
+    
+    /// <summary>
+    /// Версия агрегата для оптимистичной блокировки.
+    /// Инкрементируется в БД при каждом обновлении.
+    /// API-операции проверяют версию при сохранении, чтобы избежать конфликтов с воркерами.
+    /// </summary>
+    public int Version { get; private set; }
 
     // События домена
     private readonly List<IDomainEvent> _domainEvents = new();
@@ -73,6 +80,19 @@ public sealed class ScheduledTask
         string? encryptedSensitiveData,
         DateTime utcNow)
     {
+        // Валидация senderId
+        if (string.IsNullOrWhiteSpace(senderId))
+            throw new ArgumentException("SenderId cannot be null or empty.", nameof(senderId));
+
+        // Валидация типа задания
+        if (!Enum.IsDefined(type))
+            throw new ArgumentException($"Invalid TaskType: {type}.", nameof(type));
+
+        // Остальные обязательные параметры
+        if (schedule is null)
+            throw new ArgumentNullException(nameof(schedule));
+        if (execution is null)
+            throw new ArgumentNullException(nameof(execution));
         Id = id;
         SenderId = senderId;
         Type = type;
@@ -88,7 +108,9 @@ public sealed class ScheduledTask
         LockedUntil = null;
         CurrentAttempt = 0;
         NextExecutionAt = null; // будет установлено при планировании
-        _domainEvents.Add(new TaskCreatedEvent(this));
+        Version = 1; // Начальная версия агрегата
+        // событие теперь содержит только TaskId
+        _domainEvents.Add(new TaskCreatedEvent(Id));
     }
 
     // ========== Методы переходов статусов ==========
