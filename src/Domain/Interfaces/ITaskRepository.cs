@@ -22,7 +22,7 @@ public interface ITaskRepository
     /// Поддерживает фильтрацию по статусу и типу, пагинацию.
     /// </summary>
     Task<IReadOnlyList<ScheduledTask>> GetBySenderIdAsync(
-        string senderId, int skip, int take, 
+        SenderId senderId, int skip, int take, 
         StatusTask? status = null, TaskType? type = null, 
         CancellationToken cancellationToken = default);
 

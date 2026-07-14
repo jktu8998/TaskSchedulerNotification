@@ -11,12 +11,14 @@ public sealed class DeadLetterEntry
 {
     public long Id { get; private set; }
     public TaskId TaskId { get; private set; }
-    public string SenderId { get; private set; }   
+    public SenderId SenderId { get; private set; }   
     public string OriginalTaskSnapshot { get; private set; }
     public string? ErrorDetails { get; private set; }
     public DateTime MovedAt { get; private set; }
 
-    public DeadLetterEntry(TaskId taskId, string senderId, string originalTaskSnapshot, string? errorDetails, DateTime utcNow)
+    public DeadLetterEntry(TaskId taskId, SenderId senderId, 
+                            string originalTaskSnapshot, 
+                            string? errorDetails, DateTime utcNow)
     {
         TaskId = taskId;
         SenderId = senderId;

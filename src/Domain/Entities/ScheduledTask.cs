@@ -14,7 +14,7 @@ public sealed class ScheduledTask
 {
     // ========== Свойства ==========
     public TaskId Id { get; private set; }
-    public string SenderId { get; private set; }
+    public SenderId SenderId { get; private set; }
     public TaskType Type { get; private set; }
     public StatusTask Status { get; private set; }
     public Schedule Schedule { get; private set; }
@@ -70,7 +70,7 @@ public sealed class ScheduledTask
     /// <param name="utcNow">Текущее время (передаётся извне для тестируемости).</param>
     public ScheduledTask(
         TaskId id,
-        string senderId,
+        SenderId senderId,
         TaskType type,
         Schedule schedule,
         ExecutionConfig execution,
@@ -80,9 +80,9 @@ public sealed class ScheduledTask
         string? encryptedSensitiveData,
         DateTime utcNow)
     {
-        // Валидация senderId
-        if (string.IsNullOrWhiteSpace(senderId))
-            throw new ArgumentException("SenderId cannot be null or empty.", nameof(senderId));
+        // Конструктор SenderId(string) гарантирует непустоту, так что достаточно проверки на default.
+        if (senderId == default)
+            throw new ArgumentNullException(nameof(senderId));
 
         // Валидация типа задания
         if (!Enum.IsDefined(type))

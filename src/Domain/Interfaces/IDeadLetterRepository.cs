@@ -1,5 +1,6 @@
 
 using Domain.Entities;
+using Domain.ValueObjects;
 
 namespace Domain.Interfaces;
 
@@ -16,7 +17,8 @@ public interface IDeadLetterRepository
     Task<DeadLetterEntry?> GetByIdAsync(long id, CancellationToken cancellationToken = default);
 
     /// <summary>Получить все записи DLQ с пагинацией.</summary> // Для конкретного сервиса
-    Task<IReadOnlyList<DeadLetterEntry>> GetBySenderIdAsync(string senderId, int skip, int take, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<DeadLetterEntry>> GetBySenderIdAsync(SenderId senderId, int skip,int take,
+                                                            CancellationToken cancellationToken = default);
     
     // Для админа
     Task<IReadOnlyList<DeadLetterEntry>> GetAllAsync(int skip, int take, CancellationToken ct);
