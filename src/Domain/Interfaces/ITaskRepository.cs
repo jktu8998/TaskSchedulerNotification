@@ -53,6 +53,18 @@ public interface ITaskRepository
     Task<ScheduledTask?> AcquireNextQueuedAsync( CancellationToken cancellationToken = default);
     
     /// <summary>
+    /// Атомарно захватывает задание по идентификатору, если оно ещё в статусе Queued.
+    /// Устанавливает статус Executing и LockedUntil = utcNow + таймаут + буфер.
+    /// Возвращает задание или null, если захват не удался.
+    /// </summary>
+    /// <param name="taskId">Идентификатор задания.</param>
+    /// <param name="utcNow">Текущее время.</param>
+    /// <param name="timeoutSeconds">Таймаут выполнения в секундах (из стратегии), может быть null.</param>
+    /// <param name="ct">Токен отмены.</param>
+    Task<ScheduledTask?> TryAcquireQueuedTaskAsync(
+        TaskId taskId, DateTime utcNow, int? timeoutSeconds, CancellationToken ct);
+    
+    /// <summary>
     /// Пакетное обновление заданий (статус, время блокировки и т.д.) в одной транзакции.
     /// Реализация использует UNNEST или несколько команд в одном соединении.
     /// </summary>

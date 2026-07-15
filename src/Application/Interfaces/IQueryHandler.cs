@@ -1,7 +1,7 @@
 
 using Application.Queries;
 
-namespace Application.Handlers;
+namespace Application.Interfaces;
 
 /// <summary>Обработчик запроса.</summary>
 public interface IQueryHandler<in TQuery, TResult> where TQuery : IQuery<TResult>

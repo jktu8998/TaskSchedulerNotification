@@ -1,22 +1,21 @@
-
+using System.Text.Json;
 using Application.Commands;
 using Application.Interfaces;
+using Domain.DomainEvents;
 using Domain.Entities;
 using Domain.Interfaces;
 
 namespace Application.Handlers;
 
 /// <summary>
-/// Обработчик команды RunSchedulingCommand.
-/// Находит задания, готовые к выполнению (Scheduled + NextExecutionAt <= utcNow),
-/// переводит их в Queued и атомарно (в рамках транзакции) записывает
-/// исходящее сообщение в Outbox для гарантированной отправки в очередь.
-/// Сбой публикации в брокер больше не влияет на консистентность состояния заданий.
+/// Обработчик планирования заданий.
+/// Загружает все задачи, готовые к выполнению, переводит их в Queued
+/// и атомарно сохраняет вместе с Outbox-сообщениями.
 /// </summary>
 public sealed class RunSchedulingCommandHandler : ICommandHandler<RunSchedulingCommand>
 {
     private readonly ITaskRepository _taskRepo;
-    private readonly IOutboxRepository _outboxRepo;     // <-- Новая зависимость
+    private readonly IOutboxRepository _outboxRepo;
     private readonly IDateTimeProvider _dateTime;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDomainEventDispatcher _dispatcher;
@@ -38,64 +37,52 @@ public sealed class RunSchedulingCommandHandler : ICommandHandler<RunSchedulingC
     public async Task HandleAsync(RunSchedulingCommand command, CancellationToken cancellationToken = default)
     {
         var utcNow = _dateTime.UtcNow;
-
-        // Загружаем все задания, у которых наступило время выполнения
         var readyTasks = await _taskRepo.GetScheduledBeforeAsync(utcNow, cancellationToken);
 
+        if (readyTasks.Count == 0)
+            return;
+
+        var tasksToUpdate = new List<ScheduledTask>(readyTasks.Count);
+        var outboxMessages = new List<OutboxMessage>(readyTasks.Count);
+
+        // Подготавливаем все изменения в памяти
         foreach (var task in readyTasks)
         {
-            // Для каждого задания открываем свою транзакцию
-            await _unitOfWork.BeginTransactionAsync(cancellationToken);
-            try
-            {
-                // 1. Бизнес-переход: Scheduled -> Queued
-                task.Enqueue(utcNow);
+            task.Enqueue(utcNow);
 
-                // 2. Сохраняем изменения задания в БД
-                await _taskRepo.UpdateAsync(task, cancellationToken);
+            // Создаём outbox-сообщение для события TaskQueuedEvent
+            var queuedEvent = new TaskQueuedEvent(task.Id);
+            var outboxMessage = new OutboxMessage(
+                task.Id,
+                nameof(TaskQueuedEvent), // "TaskQueuedEvent"
+                JsonSerializer.Serialize(queuedEvent),
+                utcNow);
 
-                // 3. Создаём запись в Outbox (гарантирует, что задание будет отправлено в очередь)
-                var outboxMessage = new OutboxMessage(task.Id, utcNow);
-                await _outboxRepo.AddAsync(outboxMessage, cancellationToken);
+            tasksToUpdate.Add(task);
+            outboxMessages.Add(outboxMessage);
 
-                // 4. Диспетчеризуем события (логирование)
-                await _dispatcher.DispatchAsync(task.DomainEvents, cancellationToken);
+            // Регистрируем агрегат для автоматической очистки событий при коммите
+            _unitOfWork.Track(task);
+        }
 
-                // 5. Фиксируем транзакцию: задание в Queued + сообщение в Outbox атомарно
-                await _unitOfWork.CommitAsync(cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                // Если что-то пошло не так — откатываем только это задание
-                await _unitOfWork.RollbackAsync(cancellationToken);
-                // TODO: добавить инфраструктурный логгер
-                // _logger.LogError(ex, "Failed to schedule task {TaskId}", task.Id);
-                task.ClearDomainEvents();
-                continue; // переходим к следующему заданию
-            }
-            finally
-            {
-                // Гарантированно очищаем события после обработки
-                task.ClearDomainEvents();
-            }
+        // Атомарно сохраняем всё в одной транзакции
+        await _unitOfWork.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            await _taskRepo.BulkUpdateAsync(tasksToUpdate, cancellationToken);
+            await _outboxRepo.BulkAddAsync(outboxMessages, cancellationToken);
+
+            // Диспетчеризуем все накопленные события
+            var allEvents = tasksToUpdate.SelectMany(t => t.DomainEvents).ToList();
+            await _dispatcher.DispatchAsync(allEvents, cancellationToken);
+
+            await _unitOfWork.CommitAsync(cancellationToken);
+            // CommitAsync вызовет ClearDomainEvents у всех Tracked агрегатов
+        }
+        catch
+        {
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            throw;
         }
     }
 }
-
-///### Шаг 4: Фоновый воркер (The Relay)
-
-/*Это новый компонент, который будет жить в слое Infrastructure (обычный `BackgroundService` из ASP.NET Core). Его задача — непрерывно перекладывать сообщения из БД в брокер.
-
-- **Логика работы:**
-    
-1. Просыпается раз в N миллисекунд (например, 500 мс).
-        
-2. Забирает пачку сообщений через `IOutboxRepository.GetUnprocessedAsync` (с использованием `SELECT FOR UPDATE SKIP LOCKED` для конкурентной работы).
-        
-3. В цикле пытается отправить каждое задание через `IMessageQueue.PublishScheduledTaskAsync`.
-        
-4. При успехе — удаляет запись из базы (`RemoveAsync`).
-        
-5. При ошибке сети RabbitMQ — просто прекращает работу и ждет следующего цикла (база сохранит данные, ничего не потеряется).*/
-
-/// 

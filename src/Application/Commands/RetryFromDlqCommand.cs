@@ -1,4 +1,6 @@
 
+using Application.Interfaces;
+
 namespace Application.Commands;
 
 /// <summary>

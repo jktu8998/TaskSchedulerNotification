@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Application.Commands;
 using Application.Dto;
 using Application.Handlers;
+using Application.Handlers.CrudHandlers;
 using Application.Interfaces;
 using Domain.DomainEvents;
 using Domain.Entities;

@@ -1,20 +1,17 @@
-
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Application.Commands;
 using Application.Interfaces;
 using Domain.Entities;
 using Domain.Enums;
 using Domain.Interfaces;
-using Newtonsoft.Json;
-
-// Используем то, что выбрали ранее для DLQ
 
 namespace Application.Handlers;
 
 /// <summary>
-/// Обработчик восстановления зависших заданий.
-/// Находит задания в статусе Executing с истекшим LockedUntil.
-/// Помечает их как Failed (или Dead) и перепланирует/отправляет в DLQ.
-/// Добавлен Jitter к интервалам повторов, чтобы избежать эффекта "гремящего стада".
+/// Обработчик восстановления зависших заданий (Heartbeat).
+/// Находит задачи с истекшим LockedUntil, помечает их как Failed/Dead,
+/// и сохраняет все изменения пакетно в одной транзакции.
 /// </summary>
 public sealed class RunHeartbeatCommandHandler : ICommandHandler<RunHeartbeatCommand>
 {
@@ -44,63 +41,71 @@ public sealed class RunHeartbeatCommandHandler : ICommandHandler<RunHeartbeatCom
     public async Task HandleAsync(RunHeartbeatCommand command, CancellationToken cancellationToken = default)
     {
         var utcNow = _dateTime.UtcNow;
-        
-        // Получаем "протухшие" задачи (Status == Executing && LockedUntil <= utcNow)
         var staleTasks = await _taskRepo.GetStaleExecutingTasksAsync(utcNow, cancellationToken);
-        
+
         if (staleTasks.Count == 0)
             return;
 
+        var tasksToUpdate = new List<ScheduledTask>(staleTasks.Count);
+        var dlqEntries = new List<DeadLetterEntry>();
+
         foreach (var task in staleTasks)
         {
-            await _unitOfWork.BeginTransactionAsync(cancellationToken);
-            try
-            {
-                // Помечаем как упавшую. Домен сам инкрементит попытки и решит: Failed или Dead.
-                task.MarkFailed(utcNow, "Execution timed out (recovered by Heartbeat)");
+            // 1. Помечаем задание как проваленное (домен сам инкрементит попытки и решит: Failed или Dead)
+            task.MarkFailed(utcNow, "Execution timed out (recovered by Heartbeat)");
 
-                if (task.Status == StatusTask.Failed)
+            if (task.Status == StatusTask.Failed)
+            {
+                // Вычисляем время следующей попытки с Jitter
+                var attemptIndex = task.CurrentAttempt - 1;
+                var baseInterval = attemptIndex < task.RetryPolicy.IntervalsSeconds.Length
+                    ? TimeSpan.FromSeconds(task.RetryPolicy.IntervalsSeconds[attemptIndex])
+                    : TimeSpan.FromMinutes(1);
+                var jitter = TimeSpan.FromSeconds(_random.Next(0, 16));
+                var nextRetryAt = utcNow + baseInterval + jitter;
+                task.ScheduleRetry(utcNow, nextRetryAt);
+            }
+            else if (task.Status == StatusTask.Dead)
+            {
+                // Создаём запись DLQ
+                var snapshot = JsonSerializer.Serialize(task, new JsonSerializerOptions
                 {
-                    // Вычисляем время следующей попытки и переводим в Scheduled
-                    var attemptIndex = task.CurrentAttempt - 1;
-                    var baseInterval = attemptIndex < task.RetryPolicy.IntervalsSeconds.Count
-                        ? TimeSpan.FromSeconds(task.RetryPolicy.IntervalsSeconds[attemptIndex])
-                        : TimeSpan.FromMinutes(1);
-                    // Добавляем случайный разброс (Jitter) 0–15 секунд
-                    var jitter = TimeSpan.FromSeconds(_random.Next(0, 16));
-                    var jitteredInterval = baseInterval + jitter;
-                    var nextRetryAt = utcNow + jitteredInterval;
-                    task.ScheduleRetry(utcNow, nextRetryAt);
-                }
-                else if (task.Status == StatusTask.Dead)
-                {
-                    // Все попытки исчерпаны — сохраняем в DLQ
-                    // Не забываем передать SenderId в конструктор DLQ (как мы обсудили ранее!)
-                    var snapshot = JsonConvert.SerializeObject(task);
-                    var dlqEntry = new DeadLetterEntry(
-                        task.Id, 
-                        task.SenderId, // Пробросили SenderId для ролевой модели!
-                        snapshot, 
-                        "Execution timed out and all retries exhausted", 
-                        utcNow);
-                        
-                    await _dlqRepo.AddAsync(dlqEntry, cancellationToken);
-                }
+                    ReferenceHandler = ReferenceHandler.IgnoreCycles,
+                    WriteIndented = false
+                });
 
-                await _taskRepo.UpdateAsync(task, cancellationToken);
-                await _dispatcher.DispatchAsync(task.DomainEvents, cancellationToken);
-                
-                await _unitOfWork.CommitAsync(cancellationToken);
+                var dlqEntry = new DeadLetterEntry(
+                    task.Id,
+                    task.SenderId,
+                    snapshot,
+                    "Execution timed out and all retries exhausted",
+                    utcNow);
+                dlqEntries.Add(dlqEntry);
             }
-            catch
-            {
-                await _unitOfWork.RollbackAsync(cancellationToken);
-                // TODO: Залогировать ошибку восстановления конкретной задачи
-            }
-            finally
-            {
-                task.ClearDomainEvents();
-            }
+
+            tasksToUpdate.Add(task);
+            _unitOfWork.Track(task); // очистка событий после коммита
+        }
+
+        // Сохраняем всё в одной транзакции
+        await _unitOfWork.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            await _taskRepo.BulkUpdateAsync(tasksToUpdate, cancellationToken);
+
+            if (dlqEntries.Count > 0)
+                await _dlqRepo.BulkAddAsync(dlqEntries, cancellationToken);
+
+            // Диспетчеризуем все накопленные события
+            var allEvents = tasksToUpdate.SelectMany(t => t.DomainEvents).ToList();
+            await _dispatcher.DispatchAsync(allEvents, cancellationToken);
+
+            await _unitOfWork.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            throw;
         }
     }
 }

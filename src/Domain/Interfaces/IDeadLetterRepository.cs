@@ -25,4 +25,8 @@ public interface IDeadLetterRepository
 
     /// <summary>Удалить запись из DLQ (например, после ручного перезапуска).</summary>
     Task RemoveAsync(long id, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Пакетная вставка записей в DLQ.
+    /// </summary>
+    Task BulkAddAsync(IReadOnlyCollection<DeadLetterEntry> entries, CancellationToken cancellationToken = default);
 }
