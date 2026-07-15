@@ -1,8 +1,10 @@
 using Application.Commands;
+using Application.Handlers;
+using Application.Interfaces;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Application.Handlers;
+namespace Application.Decorator;
 
 /// <summary>
 /// Декоратор, выполняющий валидацию команды перед вызовом вложенного хендлера.

@@ -1,5 +1,7 @@
 
 
+using Domain.Interfaces;
+
 namespace Application.Interfaces;
 
 /// <summary>
@@ -24,4 +26,10 @@ public interface IUnitOfWork : IAsyncDisposable
     /// Откатить транзакцию в случае ошибки.
     /// </summary>
     Task RollbackAsync(CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Зарегистрировать агрегат для отслеживания доменных событий.
+    /// После успешного коммита транзакции вызывается ClearDomainEvents().
+    /// </summary>
+    /// <param name="aggregate">Агрегат, реализующий IHasDomainEvents.</param>
+    void Track(IHasDomainEvents aggregate);
 }

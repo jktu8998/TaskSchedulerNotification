@@ -1,7 +1,5 @@
 
-using Application.Commands;
-
-namespace Application.Handlers;
+namespace Application.Interfaces;
 
 /// <summary>Обработчик команды без результата.</summary>
 public interface ICommandHandler<in TCommand> where TCommand : ICommand

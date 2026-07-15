@@ -1,4 +1,4 @@
-namespace Application.Commands;
+namespace Application.Interfaces;
 
 /// <summary>
 /// Маркерный интерфейс для команды без результата.
