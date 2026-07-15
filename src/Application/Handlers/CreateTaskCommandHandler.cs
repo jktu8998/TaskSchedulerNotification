@@ -47,7 +47,7 @@
            var schedule = ScheduleMapper.MapSchedule(req.Schedule);
    
            // 2. Маппинг ExecutionConfig
-           var execution = new ExecutionConfig(
+           var execution = new HttpExecutionConfig( 
                req.Execution.Method,
                req.Execution.Url,
                req.Execution.Headers,

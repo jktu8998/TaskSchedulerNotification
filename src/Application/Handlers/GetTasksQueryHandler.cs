@@ -1,10 +1,10 @@
-
 using Application.Dto;
 using Application.Interfaces;
+using Application.Mapping;
 using Application.Queries;
-using Domain.Entities;
 using Domain.Enums;
 using Domain.Interfaces;
+using Domain.ValueObjects;
 
 namespace Application.Handlers;
 
@@ -42,60 +42,6 @@ public sealed class GetTasksQueryHandler : IQueryHandler<GetTasksQuery, IReadOnl
             typeFilter,
             cancellationToken);
 
-        return tasks.Select(MapToResponse).ToList().AsReadOnly();
-    }
-
-    private static TaskResponse MapToResponse(ScheduledTask task)
-    {
-        // Аналогично GetTaskByIdQueryHandler.MapToResponse
-        return new TaskResponse
-        {
-            Id = task.Id.Value,
-            SenderId = task.SenderId,
-            Type = task.Type.ToString(),
-            Status = task.Status.ToString(),
-            Schedule = new ScheduleDto
-            {
-                ExecuteAt = task.Schedule.ExecuteAt?.ToString("o"),
-                Offset = task.Schedule.Offset.HasValue ? FormatOffset(task.Schedule.Offset.Value) : null,
-                Cron = task.Schedule.CronExpression,
-                Timezone = task.Schedule.Timezone
-            },
-            Execution = new ExecutionConfigDto
-            {
-                Method = task.Execution.Method,
-                Url = task.Execution.Url,
-                Headers = task.Execution.Headers?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
-                Body = task.Execution.Body,
-                TimeoutSeconds = task.Execution.TimeoutSeconds
-            },
-            ResultDelivery = task.ResultDelivery != null ? new ResultDeliveryConfigDto
-            {
-                Mode = task.ResultDelivery.Mode.ToString(),
-                Url = task.ResultDelivery.Url,
-                Method = task.ResultDelivery.Method,
-                Params = task.ResultDelivery.Params
-            } : null,
-            PollingConfig = task.PollingConfig != null ? new PollingConfigDto
-            {
-                Field = task.PollingConfig.Field,
-                Condition = task.PollingConfig.Condition,
-                Value = task.PollingConfig.Value,
-                IntervalSeconds = task.PollingConfig.IntervalSeconds,
-                VerboseLogging = task.PollingConfig.VerboseLogging
-            } : null,
-            Retry = new RetryPolicyDto { IntervalsSeconds = task.RetryPolicy.IntervalsSeconds.ToArray() },
-            CurrentAttempt = task.CurrentAttempt,
-            CreatedAt = new DateTimeOffset(task.CreatedAt, TimeSpan.Zero),
-            UpdatedAt = task.UpdatedAt.HasValue ? new DateTimeOffset(task.UpdatedAt.Value, TimeSpan.Zero) : null,
-            NextExecutionAt = task.NextExecutionAt.HasValue ? new DateTimeOffset(task.NextExecutionAt.Value, TimeSpan.Zero) : null
-        };
-    }
-
-    private static string FormatOffset(TimeSpan offset)
-    {
-        if (offset.TotalMinutes >= 1 && offset.TotalMinutes % 60 == 0) return $"{(int)offset.TotalHours}h";
-        if (offset.TotalSeconds >= 60 && offset.TotalSeconds % 60 == 0) return $"{(int)offset.TotalMinutes}m";
-        return $"{(int)offset.TotalSeconds}s";
+        return tasks.Select(TaskMapper.MapToResponse).ToList().AsReadOnly();
     }
 }

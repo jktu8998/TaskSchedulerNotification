@@ -1,4 +1,6 @@
 
+using System.Text.Json.Serialization;
+
 namespace Application.Dto;
 
 /// <summary>
@@ -15,4 +17,11 @@ public sealed record CreateTaskRequest
     public PollingConfigDto? PollingConfig { get; init; }
     public RetryPolicyDto? Retry { get; init; }
     public string? SensitiveData { get; init; }
+    /// <summary>
+    /// Произвольные дополнительные поля, которые не предусмотрены явными свойствами.
+    /// Автоматически заполняется System.Text.Json при десериализации.
+    /// Все значения должны быть строками (для совместимости с TaskMetadata).
+    /// </summary>
+    [JsonExtensionData]
+    public Dictionary<string, object>? ExtensionData { get; init; }
 }
