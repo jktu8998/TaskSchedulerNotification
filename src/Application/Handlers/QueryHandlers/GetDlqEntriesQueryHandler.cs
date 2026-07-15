@@ -40,7 +40,7 @@ public sealed class GetDlqEntriesQueryHandler : IQueryHandler<GetDlqEntriesQuery
         {
             Id = entry.Id,
             TaskId = entry.TaskId.Value,
-            SenderId = entry.SenderId, // Добавили вывод SenderId для удобства админа
+            SenderId = entry.SenderId.ToString(), // Добавили вывод SenderId для удобства админа
             OriginalTaskSnapshot = entry.OriginalTaskSnapshot,
             ErrorDetails = entry.ErrorDetails,
             MovedAt = new DateTimeOffset(entry.MovedAt, TimeSpan.Zero)

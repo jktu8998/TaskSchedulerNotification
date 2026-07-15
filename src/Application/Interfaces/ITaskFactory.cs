@@ -17,4 +17,8 @@ public interface ITaskFactory
     /// <param name="utcNow">Текущее время.</param>
     /// <returns>Новый агрегат с проставленным NextExecutionAt и статусом Scheduled.</returns>
     ScheduledTask CreateFromRequest(CreateTaskRequest request, string senderId, DateTime utcNow);
+    /// <summary>
+    /// Создаёт агрегат из снапшота DLQ, где sensitive-данные уже зашифрованы.
+    /// </summary>
+    ScheduledTask CreateFromSnapshot(TaskSnapshotDto snapshot, string senderId, DateTime utcNow);
 }

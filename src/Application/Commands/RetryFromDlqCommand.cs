@@ -8,4 +8,4 @@ namespace Application.Commands;
 /// Принимает идентификатор записи в DLQ, пересоздаёт задание и возвращает 
 /// идентификатор нового созданного задания.
 /// </summary>
-public sealed record RetryFromDlqCommand(long DlqEntryId) : ICommand<Guid>; // возвращает новый TaskId  
+public sealed record RetryFromDlqCommand(long DlqEntryId) : ICommand<Guid>, ITransactionalCommand; // возвращает новый TaskId  

@@ -1,7 +1,9 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Application.Commands;
+using Application.Dto;
 using Application.Interfaces;
+using Application.Mapping;
 using Domain.Entities;
 using Domain.Enums;
 using Domain.Interfaces;
@@ -119,11 +121,41 @@ public sealed class RunExecutionCommandHandler : ICommandHandler<RunExecutionCom
                 }
                 else if (task.Status == StatusTask.Dead)
                 {
-                    var snapshot = JsonSerializer.Serialize(task, new JsonSerializerOptions
+                    // Создаём DTO-снапшот
+                    var snapshotDto = new TaskSnapshotDto
                     {
-                        ReferenceHandler = ReferenceHandler.IgnoreCycles,
-                        WriteIndented = false
-                    });
+                        SenderId = task.SenderId.ToString(),
+                        Type = task.Type.ToString(),
+                        Schedule = new ScheduleDto
+                        {
+                            ExecuteAt = task.Schedule.ExecuteAt?.ToString("o"),
+                            Offset = task.Schedule.Offset.HasValue ? TaskMapper.FormatOffset(task.Schedule.Offset.Value) : null,
+                            Cron = task.Schedule.CronExpression,
+                            Timezone = task.Schedule.Timezone
+                        },
+                        Execution = TaskMapper.MapExecutionToDto(task.Strategy),
+                        ResultDelivery = task.ResultDelivery is not null ? new ResultDeliveryConfigDto
+                        {
+                            Mode = task.ResultDelivery.Mode.ToString(),
+                            Url = task.ResultDelivery.Url,
+                            Method = task.ResultDelivery.Method,
+                            Params = task.ResultDelivery.Params
+                        } : null,
+                        PollingConfig = task.PollingConfig is not null ? new PollingConfigDto
+                        {
+                            Field = task.PollingConfig.Field,
+                            Condition = task.PollingConfig.Condition,
+                            Value = task.PollingConfig.Value,
+                            IntervalSeconds = task.PollingConfig.IntervalSeconds,
+                            VerboseLogging = task.PollingConfig.VerboseLogging
+                        } : null,
+                        Retry = new RetryPolicyDto { IntervalsSeconds = task.RetryPolicy.IntervalsSeconds.ToArray() },
+                        EncryptedSensitiveData = task.EncryptedSensitiveData,
+                        Metadata = task.Metadata.Data.Count > 0
+                            ? task.Metadata.Data.ToDictionary(kvp => kvp.Key, kvp => kvp.Value)
+                            : null
+                    };
+                    var snapshot = JsonSerializer.Serialize(snapshotDto);
                     var dlqEntry = new DeadLetterEntry(task.Id, task.SenderId, snapshot,
                         response.Body ?? "Unknown error", utcNow);
                     await _dlqRepo.AddAsync(dlqEntry, cancellationToken);

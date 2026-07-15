@@ -58,6 +58,11 @@ public static class TaskMapper
             _ => throw new ArgumentException($"Unsupported execution type: {type}")
         };
     }
+    public static ExecutionConfigDto MapExecutionToDto(ExecutionStrategy strategy) => MapExecutionConfig(strategy);
+    // public static ExecutionConfigDto MapExecutionToDto(ExecutionStrategy strategy)
+    // {
+    //     return MapExecutionConfig(strategy); // уже есть приватный метод
+    // }
 
     // Приватные хелперы маппинга составных частей ответа
 
@@ -116,7 +121,7 @@ public static class TaskMapper
     };
 
     //потом можно добавить недели и месяцы 
-    private static string FormatOffset(TimeSpan offset)
+    public static string FormatOffset(TimeSpan offset)
     {
         if (offset.TotalSeconds == 0) return "0s";
         if (offset.TotalDays >= 1 && offset.TotalDays % 1 == 0) return $"{(int)offset.TotalDays}d";

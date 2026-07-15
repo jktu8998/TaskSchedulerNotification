@@ -8,68 +8,81 @@ using Domain.ValueObjects;
 
 namespace Application.Services;
 
-/// <summary>
-/// Фабрика создания агрегата ScheduledTask из DTO.
-/// Инкапсулирует маппинг, шифрование, метаданные и планирование.
-/// </summary>
 public sealed class TaskFactory : ITaskFactory
 {
     private readonly IEncryptionService _encryption;
 
-    public TaskFactory(IEncryptionService encryption)
-    {
-        _encryption = encryption;
-    }
+    public TaskFactory(IEncryptionService encryption) => _encryption = encryption;
 
     public ScheduledTask CreateFromRequest(CreateTaskRequest request, string senderId, DateTime utcNow)
     {
-        // 1. Расписание
-        var schedule = ScheduleMapper.MapSchedule(request.Schedule);
+        string? encrypted = null;
+        if (!string.IsNullOrWhiteSpace(request.SensitiveData))
+            encrypted = _encryption.Encrypt(request.SensitiveData);
 
-        // 2. Стратегия выполнения
-        var strategy = TaskMapper.CreateExecutionStrategy(request.Execution);
+        return BuildTask(
+            request.Type, request.Schedule, request.Execution,
+            request.ResultDelivery, request.PollingConfig, request.Retry,
+            encrypted, request.ExtensionData, senderId, utcNow);
+    }
 
-        // 3. ResultDelivery
+    public ScheduledTask CreateFromSnapshot(TaskSnapshotDto snapshot, string senderId, DateTime utcNow)
+    {
+        // Конвертируем метаданные в ExtensionData для переиспользования BuildTask
+        Dictionary<string, object>? extensionData = null;
+        if (snapshot.Metadata is { Count: > 0 })
+        {
+            extensionData = new Dictionary<string, object>(snapshot.Metadata.Count);
+            foreach (var kvp in snapshot.Metadata)
+                extensionData[kvp.Key] = kvp.Value;
+        }
+
+        return BuildTask(
+            snapshot.Type, snapshot.Schedule, snapshot.Execution,
+            snapshot.ResultDelivery, snapshot.PollingConfig, snapshot.Retry,
+            snapshot.EncryptedSensitiveData, // уже зашифровано
+            extensionData, senderId, utcNow);
+    }
+
+    private ScheduledTask BuildTask(
+        string type, ScheduleDto scheduleDto, ExecutionConfigDto execDto,
+        ResultDeliveryConfigDto? resultDeliveryDto, PollingConfigDto? pollingDto,
+        RetryPolicyDto? retryDto, string? encryptedSensitive,
+        Dictionary<string, object>? extensionData, string senderId, DateTime utcNow)
+    {
+        var schedule = ScheduleMapper.MapSchedule(scheduleDto);
+        var strategy = TaskMapper.CreateExecutionStrategy(execDto);
+
         ResultDeliveryConfig? resultDelivery = null;
-        if (request.ResultDelivery is not null)
+        if (resultDeliveryDto is not null)
         {
-            var mode = Enum.Parse<ResultDeliveryMode>(request.ResultDelivery.Mode, ignoreCase: true);
-            resultDelivery = new ResultDeliveryConfig(
-                mode,
-                request.ResultDelivery.Url,
-                request.ResultDelivery.Method,
-                request.ResultDelivery.Params);
+            var mode = Enum.Parse<ResultDeliveryMode>(resultDeliveryDto.Mode, ignoreCase: true);
+            resultDelivery = new ResultDeliveryConfig(mode, resultDeliveryDto.Url,
+                resultDeliveryDto.Method, resultDeliveryDto.Params);
         }
 
-        // 4. PollingConfig
         PollingConfig? pollingConfig = null;
-        if (request.PollingConfig is not null)
+        if (pollingDto is not null)
         {
-            pollingConfig = new PollingConfig(
-                request.PollingConfig.Field,
-                request.PollingConfig.Condition,
-                request.PollingConfig.Value,
-                request.PollingConfig.IntervalSeconds,
-                request.PollingConfig.VerboseLogging);
+            pollingConfig = new PollingConfig(pollingDto.Field, pollingDto.Condition,
+                pollingDto.Value, pollingDto.IntervalSeconds, pollingDto.VerboseLogging);
         }
 
-        // 5. RetryPolicy
-        RetryPolicy retryPolicy = request.Retry?.IntervalsSeconds is { Length: > 0 } intervals
+        RetryPolicy retryPolicy = retryDto?.IntervalsSeconds is { Length: > 0 } intervals
             ? new RetryPolicy(intervals)
             : RetryPolicy.Default;
 
-        // 6. TaskMetadata из расширенных полей
         TaskMetadata metadata = TaskMetadata.Empty;
-        if (request.ExtensionData is { Count: > 0 })
+        if (extensionData is { Count: > 0 })
         {
             var stringData = new Dictionary<string, string>();
-            foreach (var kvp in request.ExtensionData)
+            foreach (var kvp in extensionData)
             {
                 string value = kvp.Value switch
                 {
-                    JsonElement jsonElement => jsonElement.ValueKind == JsonValueKind.String
-                        ? jsonElement.GetString()!
-                        : jsonElement.GetRawText(),
+                    JsonElement jsonEl => jsonEl.ValueKind == JsonValueKind.String
+                        ? jsonEl.GetString()!
+                        : jsonEl.GetRawText(),
                     string s => s,
                     _ => kvp.Value?.ToString() ?? string.Empty
                 };
@@ -78,29 +91,14 @@ public sealed class TaskFactory : ITaskFactory
             metadata = new TaskMetadata(stringData);
         }
 
-        // 7. Шифрование sensitive data
-        string? encrypted = null;
-        if (!string.IsNullOrWhiteSpace(request.SensitiveData))
-            encrypted = _encryption.Encrypt(request.SensitiveData);
-
-        // 8. Создание агрегата
         var task = new ScheduledTask(
-            TaskId.New(),
-            senderId,
-            Enum.Parse<TaskType>(request.Type, ignoreCase: true),
-            schedule,
-            strategy,
-            resultDelivery,
-            pollingConfig,
-            retryPolicy,
-            encrypted,
-            utcNow,
-            metadata);
+            TaskId.New(), senderId, Enum.Parse<TaskType>(type, ignoreCase: true),
+            schedule, strategy, resultDelivery, pollingConfig, retryPolicy,
+            encryptedSensitive, utcNow, metadata);
 
-        // 9. Вычисление и планирование первого запуска
-        var nextExecutionAt = task.Schedule.GetNextOccurrence(task.CreatedAt)
+        var nextExecution = task.Schedule.GetNextOccurrence(task.CreatedAt)
             ?? throw new InvalidOperationException("Cron expression has no future occurrences.");
-        task.ScheduleTask(utcNow, nextExecutionAt);
+        task.ScheduleTask(utcNow, nextExecution);
 
         return task;
     }
