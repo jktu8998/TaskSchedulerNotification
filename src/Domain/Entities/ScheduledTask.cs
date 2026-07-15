@@ -2,6 +2,7 @@
 using Domain.Enums;
 using Domain.ValueObjects;
 using Domain.DomainEvents;
+using Domain.Interfaces;
 
 namespace Domain.Entities;
 
@@ -10,7 +11,7 @@ namespace Domain.Entities;
 /// Все методы изменения состояния принимают текущее время параметром,
 /// что делает сущность тестируемой и не зависящей от системных часов.
 /// </summary>
-public sealed class ScheduledTask
+public sealed class ScheduledTask : IHasDomainEvents
 {
     // ========== Свойства ==========
     public TaskId Id { get; private set; }

@@ -1,5 +1,5 @@
-
 using Application.Commands;
+using Application.Dto;
 using Application.Interfaces;
 using Application.Mapping;
 using Domain.Entities;
@@ -54,12 +54,8 @@ public sealed class UpdateTaskCommandHandler : ICommandHandler<UpdateTaskCommand
 
         // 2. Создаём новое задание на основе DTO
         var req = command.UpdatedFields;
-        var schedule =ScheduleMapper.MapSchedule(req.Schedule);
-        var execution = new ExecutionConfig(req.Execution.Method,
-                                            req.Execution.Url,
-                                            req.Execution.Headers, 
-                                            req.Execution.Body,
-                                            req.Execution.TimeoutSeconds);
+        var schedule = ScheduleMapper.MapSchedule(req.Schedule);
+        var executionStrategy = TaskMapper.CreateExecutionStrategy(req.Execution);
 
         ResultDeliveryConfig? resultDelivery = null;
         if (req.ResultDelivery != null)
@@ -89,7 +85,7 @@ public sealed class UpdateTaskCommandHandler : ICommandHandler<UpdateTaskCommand
             _requestContext.SenderId,
             Enum.Parse<TaskType>(req.Type, ignoreCase: true),
             schedule,
-            execution,
+            executionStrategy,
             resultDelivery,
             pollingConfig,
             retryPolicy,
@@ -100,30 +96,17 @@ public sealed class UpdateTaskCommandHandler : ICommandHandler<UpdateTaskCommand
             ?? throw new InvalidOperationException("Cron expression has no future occurrences.");
         newTask.ScheduleTask(utcNow, nextExecutionAt);
 
-        // 3. Сохраняем оба изменения в одной транзакции
-        await _unitOfWork.BeginTransactionAsync(cancellationToken);
-        try
-        {
-            await _taskRepo.UpdateAsync(oldTask, cancellationToken);
-            await _dispatcher.DispatchAsync(oldTask.DomainEvents, cancellationToken);
+        // 3. Регистрируем оба агрегата для автоочистки событий при коммите
+        _unitOfWork.Track(oldTask);
+        _unitOfWork.Track(newTask);
 
-            await _taskRepo.AddAsync(newTask, cancellationToken);
-            await _dispatcher.DispatchAsync(newTask.DomainEvents, cancellationToken);
+        // 4. Сохранение и диспетчеризация событий
+        await _taskRepo.UpdateAsync(oldTask, cancellationToken);
+        await _dispatcher.DispatchAsync(oldTask.DomainEvents, cancellationToken);
 
-            await _unitOfWork.CommitAsync(cancellationToken);
-        }
-        catch
-        {
-            await _unitOfWork.RollbackAsync(cancellationToken);
-            oldTask.ClearDomainEvents();
-            newTask.ClearDomainEvents();
-            throw;
-        }
+        await _taskRepo.AddAsync(newTask, cancellationToken);
+        await _dispatcher.DispatchAsync(newTask.DomainEvents, cancellationToken);
 
-        oldTask.ClearDomainEvents();
-        newTask.ClearDomainEvents();
         return newTask.Id.Value;
     }
-
-    
 }

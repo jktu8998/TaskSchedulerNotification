@@ -1,8 +1,10 @@
 
+using Application.Interfaces;
+
 namespace Application.Commands;
 
 /// <summary>
 /// Команда на возобновление приостановленного задания.
 /// Переводит задание из Paused обратно в Scheduled.
 /// </summary>
-public sealed record ResumeTaskCommand(Guid TaskId) : ICommand;
+public sealed record ResumeTaskCommand(Guid TaskId) : ICommand, ITransactionalCommand;

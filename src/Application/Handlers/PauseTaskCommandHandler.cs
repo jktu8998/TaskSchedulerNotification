@@ -1,4 +1,3 @@
-
 using Application.Commands;
 using Application.Interfaces;
 using Domain.Interfaces;
@@ -39,26 +38,15 @@ public sealed class PauseTaskCommandHandler : ICommandHandler<PauseTaskCommand>
         var taskId = TaskId.From(command.TaskId);
         var task = await _taskRepo.GetByIdAsync(taskId, cancellationToken);
 
-        // Проверяем, что задание существует и принадлежит текущему отправителю
         if (task == null || task.SenderId != _requestContext.SenderId)
             throw new InvalidOperationException("Task not found or access denied.");
 
         var utcNow = _dateTime.UtcNow;
+        task.Pause(utcNow);
 
-        await _unitOfWork.BeginTransactionAsync(cancellationToken);
-        try
-        {
-            task.Pause(utcNow); // внутри проверит статус
-            await _taskRepo.UpdateAsync(task, cancellationToken);
-            await _dispatcher.DispatchAsync(task.DomainEvents, cancellationToken);
-            await _unitOfWork.CommitAsync(cancellationToken);
-        }
-        catch
-        {
-            await _unitOfWork.RollbackAsync(cancellationToken);
-            task.ClearDomainEvents();
-            throw;
-        }
-        task.ClearDomainEvents();
+        _unitOfWork.Track(task);
+
+        await _taskRepo.UpdateAsync(task, cancellationToken);
+        await _dispatcher.DispatchAsync(task.DomainEvents, cancellationToken);
     }
 }
