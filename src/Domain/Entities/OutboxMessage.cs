@@ -30,6 +30,10 @@ public sealed class OutboxMessage
 
     /// <summary>Время создания записи (UTC).</summary>
     public DateTime CreatedAt { get; private set; }
+    
+    public int RetryCount { get; private set; }
+    public int MaxRetries { get; private set; }
+
 
     /// <summary>
     /// Создаёт новое исходящее сообщение.
@@ -38,16 +42,34 @@ public sealed class OutboxMessage
     /// <param name="eventType">Тип события (обязательный, непустой).</param>
     /// <param name="payload">Сериализованное содержимое события (опционально).</param>
     /// <param name="createdAt">Текущее время (передаётся извне для тестируемости).</param>
-    public OutboxMessage(TaskId taskId, string eventType, string? payload, DateTime createdAt)
+    public OutboxMessage(
+        TaskId taskId,
+        string eventType,
+        string? payload,
+        DateTime createdAt,
+        int maxRetries = 3)    
     {
         if (string.IsNullOrWhiteSpace(eventType))
             throw new ArgumentException("EventType cannot be null or empty.", nameof(eventType));
+        if (maxRetries < 0)
+            throw new ArgumentException("MaxRetries cannot be negative.", nameof(maxRetries));
 
         Id = Guid.NewGuid();
         TaskId = taskId;
         EventType = eventType;
         Payload = payload;
         CreatedAt = createdAt;
+        RetryCount = 0;
+        MaxRetries = maxRetries;
+    }
+    /// <summary>
+    /// Инкрементирует счётчик попыток и возвращает true, если лимит не исчерпан.
+    /// </summary>
+    public bool TryIncrementRetry()
+    {
+        if (RetryCount >= MaxRetries) return false;
+        RetryCount++;
+        return true;
     }
 
     private OutboxMessage() { } // для Dapper

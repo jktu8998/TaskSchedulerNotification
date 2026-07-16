@@ -42,4 +42,10 @@ public interface IOutboxRepository
     /// <param name="messages">Коллекция новых сообщений для вставки.</param>
     /// <param name="ct">Токен отмены.</param>
     Task BulkAddAsync(IReadOnlyCollection<OutboxMessage> messages, CancellationToken ct = default);
+    
+    /// <summary>
+    /// Обновить существующее сообщение (например, увеличить счётчик попыток).
+    /// Используется после неудачной доставки, если RetryCount < MaxRetries.
+    /// </summary>
+    Task UpdateAsync(OutboxMessage message, CancellationToken cancellationToken = default);
 }

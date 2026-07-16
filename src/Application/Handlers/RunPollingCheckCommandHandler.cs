@@ -16,6 +16,7 @@ public sealed class RunPollingCheckCommandHandler : ICommandHandler<RunPollingCh
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDateTimeProvider _dateTime;
     private readonly IDomainEventDispatcher _dispatcher;
+    private readonly IOutboxRepository _outboxRepo;
 
     private const int BatchSize = 100;
 
@@ -25,7 +26,8 @@ public sealed class RunPollingCheckCommandHandler : ICommandHandler<RunPollingCh
         IHttpExecutor httpExecutor,
         IUnitOfWork unitOfWork,
         IDateTimeProvider dateTime,
-        IDomainEventDispatcher dispatcher)
+        IDomainEventDispatcher dispatcher,
+        IOutboxRepository outboxRepo)
     {
         _taskRepo = taskRepo;
         _stateRepo = stateRepo;
@@ -33,6 +35,7 @@ public sealed class RunPollingCheckCommandHandler : ICommandHandler<RunPollingCh
         _unitOfWork = unitOfWork;
         _dateTime = dateTime;
         _dispatcher = dispatcher;
+        _outboxRepo = outboxRepo;
     }
 
     public async Task HandleAsync(RunPollingCheckCommand command, CancellationToken cancellationToken = default)
@@ -92,24 +95,26 @@ public sealed class RunPollingCheckCommandHandler : ICommandHandler<RunPollingCh
             var state = previousState ?? new PollingState(acquiredTask.Id);
             state.UpdateState(newResponseJson, utcNow);
 
-            if (hasChanged)
+            // ---------- НОВЫЙ БЛОК: доставка через Outbox ----------
+            OutboxMessage? deliveryMessage = null;
+            if (hasChanged && acquiredTask.ResultDelivery is not null)
             {
-                // Доставка результата
-                if (acquiredTask.ResultDelivery is not null)
+                var deliveryPayload = JsonSerializer.Serialize(new
                 {
-                    try
-                    {
-                        var dc = acquiredTask.ResultDelivery;
-                        var deliveryRequest = new HttpRequestConfig(
-                            dc.Method, dc.Url, null,
-                            dc.Mode == ResultDeliveryMode.ForwardResponse ? response.Body : dc.Params);
-                        await _httpExecutor.ExecuteAsync(deliveryRequest, cancellationToken);
-                    }
-                    catch
-                    {
-                        // TODO: error handling
-                    }
-                }
+                    mode = acquiredTask.ResultDelivery.Mode.ToString(),
+                    url = acquiredTask.ResultDelivery.Url,
+                    method = acquiredTask.ResultDelivery.Method,
+                    body = acquiredTask.ResultDelivery.Mode == ResultDeliveryMode.ForwardResponse
+                        ? response.Body
+                        : acquiredTask.ResultDelivery.Params
+                });
+
+                deliveryMessage = new OutboxMessage(
+                    acquiredTask.Id,
+                    "ResultDeliveryRequested",
+                    deliveryPayload,
+                    utcNow,
+                    maxRetries: 3);
             }
 
             // Перепланируем задание
@@ -123,6 +128,8 @@ public sealed class RunPollingCheckCommandHandler : ICommandHandler<RunPollingCh
                 _unitOfWork.Track(acquiredTask);
                 await _taskRepo.UpdateAsync(acquiredTask, acquiredTask.Version, cancellationToken);
                 await _stateRepo.UpsertAsync(state, cancellationToken);
+                if (deliveryMessage is not null)
+                    await _outboxRepo.AddAsync(deliveryMessage, cancellationToken);
                 await _dispatcher.DispatchAsync(acquiredTask.DomainEvents, cancellationToken);
                 await _unitOfWork.CommitAsync(cancellationToken);
             }

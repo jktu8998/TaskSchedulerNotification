@@ -24,6 +24,7 @@ public sealed class RunExecutionCommandHandler : ICommandHandler<RunExecutionCom
     private readonly IDomainEventDispatcher _dispatcher;
     private readonly IDeadLetterRepository _dlqRepo;
     private readonly IRandomProvider _random;
+    private readonly IOutboxRepository _outboxRepo;
 
     public RunExecutionCommandHandler(
         ITaskRepository taskRepo,
@@ -32,7 +33,8 @@ public sealed class RunExecutionCommandHandler : ICommandHandler<RunExecutionCom
         IDateTimeProvider dateTime,
         IDomainEventDispatcher dispatcher,
         IDeadLetterRepository dlqRepo,
-        IRandomProvider random)
+        IRandomProvider random,
+        IOutboxRepository outboxRep)
     {
         _taskRepo = taskRepo;
         _httpExecutor = httpExecutor;
@@ -41,6 +43,7 @@ public sealed class RunExecutionCommandHandler : ICommandHandler<RunExecutionCom
         _dispatcher = dispatcher;
         _dlqRepo = dlqRepo;
         _random = random;
+        _outboxRepo = outboxRep;
     }
 
     public async Task HandleAsync(RunExecutionCommand command, CancellationToken cancellationToken = default)
@@ -123,6 +126,27 @@ public sealed class RunExecutionCommandHandler : ICommandHandler<RunExecutionCom
                     await _dlqRepo.AddAsync(dlqEntry, cancellationToken);
                 }
             }
+            if (response.IsSuccess && task.ResultDelivery is not null)
+            {
+                var deliveryPayload = JsonSerializer.Serialize(new
+                {
+                    mode = task.ResultDelivery.Mode.ToString(),
+                    url = task.ResultDelivery.Url,
+                    method = task.ResultDelivery.Method,
+                    body = task.ResultDelivery.Mode == ResultDeliveryMode.ForwardResponse
+                        ? response.Body
+                        : task.ResultDelivery.Params
+                });
+
+                var outboxMessage = new OutboxMessage(
+                    task.Id,
+                    "ResultDeliveryRequested",
+                    deliveryPayload,
+                    utcNow,
+                    maxRetries: 3);
+
+                await _outboxRepo.AddAsync(outboxMessage, cancellationToken);
+            }
 
             _unitOfWork.Track(task);// возможно оно не на своем месте и должно быть после коммита 
             await _taskRepo.UpdateAsync(task,task.Version, cancellationToken);
@@ -135,7 +159,7 @@ public sealed class RunExecutionCommandHandler : ICommandHandler<RunExecutionCom
             throw;
         }
 
-        // Доставка результата (вне транзакции)
+        /*// Доставка результата (вне транзакции)
         if (response.IsSuccess && task.ResultDelivery is not null)
         {
             try
@@ -156,6 +180,6 @@ public sealed class RunExecutionCommandHandler : ICommandHandler<RunExecutionCom
             {
                 // TODO: логировать ошибку доставки
             }
-        }
+        }*/
     }
 }
