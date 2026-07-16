@@ -54,8 +54,10 @@ public sealed class ScheduledTask : IHasDomainEvents
     
     public int CurrentAttempt { get; private set; }
     public TaskMetadata Metadata { get; private set; }
-    // ========== НОВОЕ: ключ идемпотентности ==========
+    // ==========  ключ идемпотентности ==========
     public string IdempotencyKey { get; private set; }
+    // ==========  сырой JSON-запрос ==========
+    public string RawPayload { get; private set; }
 
     // Пустой конструктор для маппинга из БД (Dapper)
     private ScheduledTask() { }
@@ -85,7 +87,8 @@ public sealed class ScheduledTask : IHasDomainEvents
         string? encryptedSensitiveData,
         DateTime utcNow,
         TaskMetadata? metadata ,
-        string idempotencyKey)
+        string idempotencyKey,
+        string rawPayload)
     {
         // Конструктор SenderId(string) гарантирует непустоту, так что достаточно проверки на default.
         if (senderId == default)
@@ -104,7 +107,8 @@ public sealed class ScheduledTask : IHasDomainEvents
             throw new ArgumentException("Idempotency key cannot be null or empty.", nameof(idempotencyKey));
         if (idempotencyKey.Length > 128)
             throw new ArgumentException("Idempotency key must be at most 128 characters.", nameof(idempotencyKey));
-
+        if (string.IsNullOrWhiteSpace(rawPayload))
+            throw new ArgumentException("RawPayload cannot be null or empty.", nameof(rawPayload));
         Id = id;
         SenderId = senderId;
         Type = type;
