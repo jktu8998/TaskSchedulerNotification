@@ -1,11 +1,10 @@
-
 using Application.Dto;
 using Application.Interfaces;
 using Application.Queries;
 using Domain.Entities;
 using Domain.Interfaces;
 
-namespace Application.Handlers;
+namespace Application.Handlers.Query;
 
 /// <summary>
 /// Обработчик запроса записей DLQ.

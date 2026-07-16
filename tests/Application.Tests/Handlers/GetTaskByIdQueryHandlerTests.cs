@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Application.Dto;
 using Application.Handlers;
+using Application.Handlers.Query;
 using Application.Interfaces;
 using Application.Queries;
 using Domain.Entities;

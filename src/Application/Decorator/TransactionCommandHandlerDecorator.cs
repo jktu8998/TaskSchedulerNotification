@@ -1,4 +1,3 @@
-using Application.Handlers;
 using Application.Interfaces;
 
 namespace Application.Decorator;

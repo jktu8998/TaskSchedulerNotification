@@ -3,7 +3,7 @@ using Application.Interfaces;
 using Domain.Interfaces;
 using Domain.ValueObjects;
 
-namespace Application.Handlers;
+namespace Application.Handlers.CrudHandlers;
 
 /// <summary>
 /// Обработчик команды возобновления задания.

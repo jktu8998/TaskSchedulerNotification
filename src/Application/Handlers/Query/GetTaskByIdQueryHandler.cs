@@ -5,7 +5,7 @@ using Application.Queries;
 using Domain.Interfaces;
 using Domain.ValueObjects;
 
-namespace Application.Handlers;
+namespace Application.Handlers.Query;
 
 /// <summary>
 /// Обработчик запроса на получение задания по идентификатору.

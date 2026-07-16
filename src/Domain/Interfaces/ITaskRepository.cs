@@ -71,4 +71,14 @@ public interface ITaskRepository
     /// <param name="tasks">Коллекция заданий с изменённым состоянием.</param>
     /// <param name="ct">Токен отмены.</param>
     Task BulkUpdateAsync(IReadOnlyCollection<ScheduledTask> tasks, CancellationToken ct = default);
+    
+    // ========== НОВЫЙ МЕТОД ==========
+    /// <summary>
+    /// Найти задание по ключу идемпотентности.
+    /// Используется для предотвращения дубликатов при повторных запросах создания.
+    /// </summary>
+    /// <param name="idempotencyKey">Ключ идемпотентности.</param>
+    /// <param name="cancellationToken">Токен отмены.</param>
+    /// <returns>Задание или null, если не найдено.</returns>
+    Task<ScheduledTask?> GetByIdempotencyKeyAsync(string idempotencyKey, CancellationToken cancellationToken = default);
 }

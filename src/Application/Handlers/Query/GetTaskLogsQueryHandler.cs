@@ -1,11 +1,10 @@
-
 using Application.Dto;
 using Application.Interfaces;
 using Application.Queries;
 using Domain.Interfaces;
 using Domain.ValueObjects;
 
-namespace Application.Handlers;
+namespace Application.Handlers.Query;
 
 /// <summary>
 /// Обработчик запроса логов задания.

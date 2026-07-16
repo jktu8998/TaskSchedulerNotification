@@ -4,9 +4,8 @@ using Application.Mapping;
 using Application.Queries;
 using Domain.Enums;
 using Domain.Interfaces;
-using Domain.ValueObjects;
 
-namespace Application.Handlers;
+namespace Application.Handlers.Query;
 
 /// <summary>
 /// Обработчик запроса на получение списка заданий.

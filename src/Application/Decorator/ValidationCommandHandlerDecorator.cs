@@ -1,5 +1,3 @@
-using Application.Commands;
-using Application.Handlers;
 using Application.Interfaces;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;

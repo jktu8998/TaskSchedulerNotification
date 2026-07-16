@@ -54,6 +54,8 @@ public sealed class ScheduledTask : IHasDomainEvents
     
     public int CurrentAttempt { get; private set; }
     public TaskMetadata Metadata { get; private set; }
+    // ========== НОВОЕ: ключ идемпотентности ==========
+    public string IdempotencyKey { get; private set; }
 
     // Пустой конструктор для маппинга из БД (Dapper)
     private ScheduledTask() { }
@@ -82,7 +84,8 @@ public sealed class ScheduledTask : IHasDomainEvents
         RetryPolicy? retryPolicy,
         string? encryptedSensitiveData,
         DateTime utcNow,
-        TaskMetadata? metadata = null)
+        TaskMetadata? metadata ,
+        string idempotencyKey)
     {
         // Конструктор SenderId(string) гарантирует непустоту, так что достаточно проверки на default.
         if (senderId == default)
@@ -97,6 +100,10 @@ public sealed class ScheduledTask : IHasDomainEvents
             throw new ArgumentNullException(nameof(schedule));
         if (strategy is null)
             throw new ArgumentNullException(nameof(strategy));
+        if (string.IsNullOrWhiteSpace(idempotencyKey))
+            throw new ArgumentException("Idempotency key cannot be null or empty.", nameof(idempotencyKey));
+        if (idempotencyKey.Length > 128)
+            throw new ArgumentException("Idempotency key must be at most 128 characters.", nameof(idempotencyKey));
 
         Id = id;
         SenderId = senderId;
@@ -114,6 +121,7 @@ public sealed class ScheduledTask : IHasDomainEvents
         CurrentAttempt = 0;
         NextExecutionAt = null; // будет установлено при планировании
         Version = 1; // Начальная версия агрегата
+        IdempotencyKey = idempotencyKey;
         // событие теперь содержит только TaskId
         _domainEvents.Add(new TaskCreatedEvent(Id));
         Metadata = metadata ?? TaskMetadata.Empty;

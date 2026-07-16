@@ -4,7 +4,7 @@ using Application.Interfaces;
 using Domain.DomainEvents;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Application.Services;
+namespace Infrastructure.DomainEvents;
 
 /// <summary>
 /// Реализация диспетчера доменных событий.
