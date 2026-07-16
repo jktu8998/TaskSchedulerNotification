@@ -58,6 +58,11 @@ public sealed class ScheduledTask : IHasDomainEvents
     public string IdempotencyKey { get; private set; }
     // ==========  сырой JSON-запрос ==========
     public string RawPayload { get; private set; }
+    /// <summary>
+    /// Время, на которое был запланирован текущий запуск.
+    /// Заполняется при переходе в Executing, используется для корректного расчёта следующего cron-интервала.
+    /// </summary>
+    public DateTime? ScheduledAt { get; private set; }
 
     // Пустой конструктор для маппинга из БД (Dapper)
     private ScheduledTask() { }
@@ -126,6 +131,7 @@ public sealed class ScheduledTask : IHasDomainEvents
         NextExecutionAt = null; // будет установлено при планировании
         Version = 1; // Начальная версия агрегата
         IdempotencyKey = idempotencyKey;
+        RawPayload = rawPayload;
         // событие теперь содержит только TaskId
         _domainEvents.Add(new TaskCreatedEvent(Id));
         Metadata = metadata ?? TaskMetadata.Empty;
@@ -184,6 +190,9 @@ public sealed class ScheduledTask : IHasDomainEvents
     {
         if (Status != StatusTask.Queued)
             throw new InvalidOperationException($"Cannot start execution in status {Status}");
+        // Фиксируем запланированное время
+        ScheduledAt = NextExecutionAt;
+        NextExecutionAt = null;   // оно больше не нужно, задание выполняется сейчас
         Status = StatusTask.Executing;
         UpdatedAt = utcNow;
         LockedUntil = utcNow + lockDuration;
@@ -258,7 +267,8 @@ public sealed class ScheduledTask : IHasDomainEvents
 
     /// <summary>
     /// Отменяет задание. Может быть вызвано из любого статуса, кроме финальных.
-    /// Снимает блокировку, если задание выполнялось.
+    /// Снимает блокировку, если задание выполнялось
+    /// и очищает плановые даты.
     /// </summary>
     public void Cancel(DateTime utcNow)
     {
@@ -267,26 +277,34 @@ public sealed class ScheduledTask : IHasDomainEvents
         Status = StatusTask.Cancelled;
         UpdatedAt = utcNow;
         LockedUntil = null;
+        NextExecutionAt = null;    
+        ScheduledAt = null;
         _domainEvents.Add(new TaskCancelledEvent(Id));
     }
     
     /// <summary>
-    /// Перепланирует периодическое задание после выполнения.
-    /// Переводит из Executing обратно в Scheduled и обновляет время следующего запуска.
+    /// Перепланирует периодическое задание после успешного выполнения.
+    /// Использует сохранённое ScheduledAt для расчёта следующего времени.
     /// </summary>
     /// <param name="utcNow">Текущее время.</param>
-    /// <param name="nextExecutionAt">Абсолютное время следующего запуска.</param>
-    public void Reschedule(DateTime utcNow, DateTime nextExecutionAt)
+    public void Reschedule(DateTime utcNow)
     {
         if (Status != StatusTask.Executing)
             throw new InvalidOperationException($"Cannot reschedule task in status {Status}");
-    
+
+        if (ScheduledAt == null)
+            throw new InvalidOperationException("ScheduledAt must be set before rescheduling.");
+
+        // Вычисляем следующее время от запланированного, а не от текущего
+        var nextExecutionAt = Schedule.GetNextOccurrence(ScheduledAt.Value)
+                              ?? throw new InvalidOperationException("Schedule has no future occurrences.");
+
         Status = StatusTask.Scheduled;
         NextExecutionAt = nextExecutionAt;
         UpdatedAt = utcNow;
         LockedUntil = null;
-        // Здесь можно добавить событие TaskRescheduledEvent, но пока KISS — не будем плодить события.
-        // Просто переиспользуем TaskScheduledEvent, если нужно логирование.
+        ScheduledAt = null;
+
         _domainEvents.Add(new TaskScheduledEvent(Id));
     }
     
