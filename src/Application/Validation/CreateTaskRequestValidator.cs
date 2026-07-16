@@ -13,6 +13,10 @@ public sealed class CreateTaskRequestValidator : AbstractValidator<CreateTaskReq
         ScheduleDtoValidator scheduleValidator,
         ExecutionConfigDtoValidator executionValidator)
     {
+        // Новое правило
+        RuleFor(x => x.IdempotencyKey)
+            .NotEmpty().WithMessage("Idempotency key is required.")
+            .MaximumLength(128).WithMessage("Idempotency key must be at most 128 characters.");
         // Тип задания
         RuleFor(x => x.Type)
             .NotEmpty().WithMessage("Task type is required.")

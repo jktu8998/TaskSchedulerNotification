@@ -9,6 +9,11 @@ namespace Application.Dto;
 /// </summary>
 public sealed record CreateTaskRequest
 {
+    /// <summary>
+    /// Ключ идемпотентности для предотвращения дублирования заданий.
+    /// Обязателен, длина ≤ 128 символов.
+    /// </summary>
+    public string IdempotencyKey { get; init; }
     /// <summary>Тип задания: "OneTime", "Periodic" или "Polling".</summary>
     public string Type { get; init; }
     public ScheduleDto Schedule { get; init; }

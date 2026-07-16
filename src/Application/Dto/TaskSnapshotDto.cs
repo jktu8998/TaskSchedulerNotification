@@ -6,6 +6,7 @@ namespace Application.Dto;
 /// </summary>
 public sealed record TaskSnapshotDto
 {
+    public string IdempotencyKey { get; init; } 
     public string SenderId { get; init; }
     public string Type { get; init; }
     public ScheduleDto Schedule { get; init; }
@@ -14,5 +15,6 @@ public sealed record TaskSnapshotDto
     public PollingConfigDto? PollingConfig { get; init; }
     public RetryPolicyDto? Retry { get; init; }
     public string? EncryptedSensitiveData { get; init; }
+    public string? RawPayload { get; init; }  
     public Dictionary<string, string>? Metadata { get; init; }
 }

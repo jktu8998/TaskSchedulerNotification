@@ -14,7 +14,7 @@ public sealed class TaskFactory : ITaskFactory
 
     public TaskFactory(IEncryptionService encryption) => _encryption = encryption;
 
-    public ScheduledTask CreateFromRequest(CreateTaskRequest request, string senderId, DateTime utcNow)
+    public ScheduledTask CreateFromRequest(CreateTaskRequest request, string senderId, DateTime utcNow,string idempotencyKey)
     {
         string? encrypted = null;
         if (!string.IsNullOrWhiteSpace(request.SensitiveData))
@@ -23,7 +23,9 @@ public sealed class TaskFactory : ITaskFactory
         return BuildTask(
             request.Type, request.Schedule, request.Execution,
             request.ResultDelivery, request.PollingConfig, request.Retry,
-            encrypted, request.ExtensionData, senderId, utcNow);
+            encrypted, request.ExtensionData, senderId, utcNow,
+            idempotencyKey, 
+            rawPayload: null);  // пока заглушка, позже заполним
     }
 
     public ScheduledTask CreateFromSnapshot(TaskSnapshotDto snapshot, string senderId, DateTime utcNow)
@@ -38,17 +40,28 @@ public sealed class TaskFactory : ITaskFactory
         }
 
         return BuildTask(
-            snapshot.Type, snapshot.Schedule, snapshot.Execution,
-            snapshot.ResultDelivery, snapshot.PollingConfig, snapshot.Retry,
-            snapshot.EncryptedSensitiveData, // уже зашифровано
-            extensionData, senderId, utcNow);
+            snapshot.Type,
+            snapshot.Schedule,
+            snapshot.Execution,
+            snapshot.ResultDelivery,
+            snapshot.PollingConfig,
+            snapshot.Retry,
+            snapshot.EncryptedSensitiveData,
+            extensionData,
+            senderId,
+            utcNow,
+            idempotencyKey: snapshot.IdempotencyKey,   // передаём ключ
+            rawPayload: snapshot.RawPayload             // передаём исходный JSON
+        );
     }
 
     private ScheduledTask BuildTask(
         string type, ScheduleDto scheduleDto, ExecutionConfigDto execDto,
         ResultDeliveryConfigDto? resultDeliveryDto, PollingConfigDto? pollingDto,
         RetryPolicyDto? retryDto, string? encryptedSensitive,
-        Dictionary<string, object>? extensionData, string senderId, DateTime utcNow)
+        Dictionary<string, object>? extensionData, string senderId, DateTime utcNow,
+        string idempotencyKey,
+        string? rawPayload)
     {
         var schedule = ScheduleMapper.MapSchedule(scheduleDto);
         var strategy = TaskMapper.CreateExecutionStrategy(execDto);
@@ -94,7 +107,9 @@ public sealed class TaskFactory : ITaskFactory
         var task = new ScheduledTask(
             TaskId.New(), senderId, Enum.Parse<TaskType>(type, ignoreCase: true),
             schedule, strategy, resultDelivery, pollingConfig, retryPolicy,
-            encryptedSensitive, utcNow, metadata);
+            encryptedSensitive, utcNow, metadata,
+            idempotencyKey,        // передаём
+            rawPayload ?? string.Empty); // если нет, передаём пустую строку (позже заменим);
 
         var nextExecution = task.Schedule.GetNextOccurrence(task.CreatedAt)
             ?? throw new InvalidOperationException("Cron expression has no future occurrences.");
