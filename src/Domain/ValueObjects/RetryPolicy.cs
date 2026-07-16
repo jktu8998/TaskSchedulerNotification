@@ -51,6 +51,25 @@ public sealed record RetryPolicy
         // Защита от мутации: копируем в ImmutableArray
         IntervalsSeconds = intervalsSeconds.ToImmutableArray();
     }
+    
+    // ========== НОВЫЙ МЕТОД ==========
+    /// <summary>
+    /// Возвращает интервал повторной попытки для указанного номера попытки.
+    /// Номер попытки 1-based (1 — первая повторная попытка, 2 — вторая и т.д.).
+    /// </summary>
+    /// <param name="attemptNumber">Номер повторной попытки (начиная с 1).</param>
+    /// <returns>Интервал в виде TimeSpan.</returns>
+    /// <exception cref="InvalidOperationException">Если номер попытки выходит за пределы политики.</exception>
+    public TimeSpan GetRetryDelay(int attemptNumber)
+    {
+        int index = attemptNumber - 1;
+        if (index < 0 || index >= IntervalsSeconds.Length)
+            throw new InvalidOperationException(
+                $"Attempt number {attemptNumber} is outside the retry policy (max attempts: {MaxAttempts}).");
+
+        return TimeSpan.FromSeconds(IntervalsSeconds[index]);
+    }
+    
     /// <summary>
     /// Реализация IEquatable&lt;RetryPolicy&gt; — структурное сравнение интервалов.
     /// </summary>

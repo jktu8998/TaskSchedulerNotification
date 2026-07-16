@@ -292,19 +292,22 @@ public sealed class ScheduledTask : IHasDomainEvents
     
     /// <summary>
     /// Переводит задание из Failed в Scheduled для повторной попытки.
-    /// Вызывается после неудачного выполнения, если CurrentAttempt < MaxAttempts.
+    /// Вычисляет NextExecutionAt как utcNow + delay.
     /// </summary>
     /// <param name="utcNow">Текущее время.</param>
-    /// <param name="nextExecutionAt">Абсолютное время следующей попытки (utcNow + интервал из RetryPolicy).</param>
-    public void ScheduleRetry(DateTime utcNow, DateTime nextExecutionAt)
+    /// <param name="delay">Задержка до следующей попытки (обычно из RetryPolicy.GetRetryDelay + jitter).</param>
+    public void ScheduleRetry(DateTime utcNow, TimeSpan delay)
     {
         if (Status != StatusTask.Failed)
             throw new InvalidOperationException($"Cannot schedule retry in status {Status}");
 
+        if (delay <= TimeSpan.Zero)
+            throw new ArgumentException("Delay must be positive.", nameof(delay));
+
         Status = StatusTask.Scheduled;
-        NextExecutionAt = nextExecutionAt;
+        NextExecutionAt = utcNow + delay;
         UpdatedAt = utcNow;
-        LockedUntil = null; // разблокируем задачу, она больше не в Executing
+        LockedUntil = null;
 
         _domainEvents.Add(new TaskScheduledEvent(Id));
     }
