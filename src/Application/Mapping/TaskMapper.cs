@@ -42,6 +42,46 @@ public static class TaskMapper
                 : null 
         };
     }
+    
+    public static TaskSnapshotDto ToSnapshot(ScheduledTask task)
+    {
+        return new TaskSnapshotDto
+        {
+            IdempotencyKey = task.IdempotencyKey,
+            SenderId = task.SenderId.ToString(),
+            Type = task.Type.ToString(),
+            Schedule = MapSchedule(task.Schedule),
+            Execution = MapExecutionToDto(task.Strategy),
+            ResultDelivery = task.ResultDelivery is not null
+                ? new ResultDeliveryConfigDto
+                {
+                    Mode = task.ResultDelivery.Mode.ToString(),
+                    Url = task.ResultDelivery.Url,
+                    Method = task.ResultDelivery.Method,
+                    Params = task.ResultDelivery.Params
+                }
+                : null,
+            PollingConfig = task.PollingConfig is not null
+                ? new PollingConfigDto
+                {
+                    Field = task.PollingConfig.Field,
+                    Condition = task.PollingConfig.Condition,
+                    Value = task.PollingConfig.Value,
+                    IntervalSeconds = task.PollingConfig.IntervalSeconds,
+                    VerboseLogging = task.PollingConfig.VerboseLogging
+                }
+                : null,
+            Retry = new RetryPolicyDto
+            {
+                IntervalsSeconds = task.RetryPolicy.IntervalsSeconds.ToArray()
+            },
+            EncryptedSensitiveData = task.EncryptedSensitiveData,
+            RawPayload = task.RawPayload,
+            Metadata = task.Metadata.Data.Count > 0
+                ? task.Metadata.Data.ToDictionary(kvp => kvp.Key, kvp => kvp.Value)
+                : null
+        };
+    }
 
     /// <summary>
     /// Фабричный метод создания стратегии выполнения по DTO.

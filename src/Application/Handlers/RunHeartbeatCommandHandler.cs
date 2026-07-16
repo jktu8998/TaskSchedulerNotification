@@ -63,45 +63,9 @@ public sealed class RunHeartbeatCommandHandler : ICommandHandler<RunHeartbeatCom
             else if (task.Status == StatusTask.Dead)
             {
                 // Создаём запись DLQ
+                
                 // Создаём DTO-снапшот и сериализуем его
-                var snapshotDto = new TaskSnapshotDto
-                {
-                    IdempotencyKey = task.IdempotencyKey,
-                    SenderId = task.SenderId.ToString(),
-                    Type = task.Type.ToString(),
-                    Schedule = new ScheduleDto
-                    {
-                        ExecuteAt = task.Schedule.ExecuteAt?.ToString("o"),
-                        Offset = task.Schedule.Offset.HasValue ? TaskMapper.FormatOffset(task.Schedule.Offset.Value) : null,
-                        Cron = task.Schedule.CronExpression,
-                        Timezone = task.Schedule.Timezone
-                    },
-                    Execution = TaskMapper.MapExecutionToDto(task.Strategy),
-                    ResultDelivery = task.ResultDelivery is not null ? new ResultDeliveryConfigDto
-                    {
-                        Mode = task.ResultDelivery.Mode.ToString(),
-                        Url = task.ResultDelivery.Url,
-                        Method = task.ResultDelivery.Method,
-                        Params = task.ResultDelivery.Params
-                    } : null,
-                    PollingConfig = task.PollingConfig is not null ? new PollingConfigDto
-                    {
-                        Field = task.PollingConfig.Field,
-                        Condition = task.PollingConfig.Condition,
-                        Value = task.PollingConfig.Value,
-                        IntervalSeconds = task.PollingConfig.IntervalSeconds,
-                        VerboseLogging = task.PollingConfig.VerboseLogging
-                    } : null,
-                    Retry = new RetryPolicyDto
-                    {
-                        IntervalsSeconds = task.RetryPolicy.IntervalsSeconds.ToArray()
-                    },
-                    EncryptedSensitiveData = task.EncryptedSensitiveData,
-                    Metadata = task.Metadata.Data.Count > 0
-                        ? task.Metadata.Data.ToDictionary(kvp => kvp.Key, kvp => kvp.Value)
-                        : null
-                };
-
+                var snapshotDto = TaskMapper.ToSnapshot(task);
                 var snapshot = JsonSerializer.Serialize(snapshotDto);
 
                 var dlqEntry = new DeadLetterEntry(
