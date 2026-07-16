@@ -77,9 +77,10 @@ public interface ITaskRepository
     /// </summary>
     /// <param name="tasks">Коллекция заданий с изменённым состоянием.</param>
     /// <param name="ct">Токен отмены.</param>
-    Task BulkUpdateAsync(IReadOnlyCollection<ScheduledTask> tasks, CancellationToken ct = default);
+    Task BulkUpdateAsync(IReadOnlyCollection<ScheduledTask> tasks, 
+        CancellationToken ct = default);
     
-    // ========== НОВЫЙ МЕТОД ==========
+    
     /// <summary>
     /// Найти задание по ключу идемпотентности.
     /// Используется для предотвращения дубликатов при повторных запросах создания.
@@ -87,5 +88,26 @@ public interface ITaskRepository
     /// <param name="idempotencyKey">Ключ идемпотентности.</param>
     /// <param name="cancellationToken">Токен отмены.</param>
     /// <returns>Задание или null, если не найдено.</returns>
-    Task<ScheduledTask?> GetByIdempotencyKeyAsync(string idempotencyKey, CancellationToken cancellationToken = default);
+    Task<ScheduledTask?> GetByIdempotencyKeyAsync(string idempotencyKey,
+        CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// Получить список polling-заданий, готовых к проверке.
+    /// </summary>
+    /// <param name="utcNow">Текущее время для сравнения с NextExecutionAt.</param>
+    /// <param name="batchSize">Максимальное количество задач в пакете.</param>
+    /// <param name="cancellationToken">Токен отмены.</param>
+    Task<IReadOnlyList<ScheduledTask>> GetScheduledPollingTasksAsync(
+        DateTime utcNow, int batchSize, 
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Атомарно захватить polling-задание для выполнения:
+    /// переводит из Scheduled в Executing и устанавливает LockedUntil,
+    /// если задание с указанным Id имеет статус Scheduled и NextExecutionAt <= utcNow.
+    /// Возвращает обновлённый агрегат или null, если захват не удался.
+    /// </summary>
+    Task<ScheduledTask?> TryAcquirePollingTaskAsync(
+        TaskId taskId, DateTime utcNow, TimeSpan lockDuration, 
+        CancellationToken cancellationToken = default);
 }

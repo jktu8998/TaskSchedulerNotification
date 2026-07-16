@@ -309,6 +309,27 @@ public sealed class ScheduledTask : IHasDomainEvents
     }
     
     /// <summary>
+    /// Перепланирует polling-задание после проверки.
+    /// Переводит из Executing обратно в Scheduled с новым интервалом.
+    /// </summary>
+    /// <param name="utcNow">Текущее время.</param>
+    /// <param name="interval">Интервал до следующей проверки (из PollingConfig.IntervalSeconds).</param>
+    public void RescheduleAfterPolling(DateTime utcNow, TimeSpan interval)
+    {
+        if (Status != StatusTask.Executing)
+            throw new InvalidOperationException($"Cannot reschedule polling task in status {Status}");
+        if (interval <= TimeSpan.Zero)
+            throw new ArgumentException("Interval must be positive.", nameof(interval));
+
+        Status = StatusTask.Scheduled;
+        NextExecutionAt = utcNow + interval;
+        UpdatedAt = utcNow;
+        LockedUntil = null;
+        // ScheduledAt не используется, polling не имеет фиксированного времени запуска
+        _domainEvents.Add(new TaskScheduledEvent(Id));
+    }
+    
+    /// <summary>
     /// Переводит задание из Failed в Scheduled для повторной попытки.
     /// Вычисляет NextExecutionAt как utcNow + delay.
     /// </summary>
