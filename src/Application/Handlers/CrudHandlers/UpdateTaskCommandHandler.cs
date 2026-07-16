@@ -1,5 +1,6 @@
 using Application.Commands;
 using Application.Interfaces;
+using Domain.Exceptions;
 using Domain.Interfaces;
 using Domain.ValueObjects;
 
@@ -46,25 +47,33 @@ public sealed class UpdateTaskCommandHandler : ICommandHandler<UpdateTaskCommand
 
         if (oldTask == null || oldTask.SenderId != _requestContext.SenderId)
             throw new InvalidOperationException("Task not found or access denied.");
-
+        var expectedVersion = oldTask.Version;
         oldTask.Cancel(utcNow);
 
         // 2. Создаём новое задание через фабрику (уже в статусе Scheduled)
         var newTask = _taskFactory.CreateFromRequest(
             command.UpdatedFields,
             _requestContext.SenderId,
-            utcNow);
+            utcNow,
+            command.UpdatedFields.IdempotencyKey);
 
         // 3. Регистрируем оба агрегата для автоочистки событий при коммите
         _unitOfWork.Track(oldTask);
         _unitOfWork.Track(newTask);
+        try
+        {
+            // 4. Сохраняем изменения и диспетчеризуем события (транзакция — декоратор)
+            await _taskRepo.UpdateAsync(oldTask, expectedVersion, cancellationToken);
+            await _dispatcher.DispatchAsync(oldTask.DomainEvents, cancellationToken);
 
-        // 4. Сохраняем изменения и диспетчеризуем события (транзакция — декоратор)
-        await _taskRepo.UpdateAsync(oldTask, cancellationToken);
-        await _dispatcher.DispatchAsync(oldTask.DomainEvents, cancellationToken);
-
-        await _taskRepo.AddAsync(newTask, cancellationToken);
-        await _dispatcher.DispatchAsync(newTask.DomainEvents, cancellationToken);
+            await _taskRepo.AddAsync(newTask, cancellationToken);
+            await _dispatcher.DispatchAsync(newTask.DomainEvents, cancellationToken);
+        }
+        catch(ConcurrencyException)
+        {
+            throw;
+        }
+       
 
         return newTask.Id.Value;
     }

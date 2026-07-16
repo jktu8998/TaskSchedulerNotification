@@ -1,5 +1,6 @@
 using Application.Commands;
 using Application.Interfaces;
+using Domain.Exceptions;
 using Domain.Interfaces;
 using Domain.ValueObjects;
 
@@ -40,13 +41,21 @@ public sealed class PauseTaskCommandHandler : ICommandHandler<PauseTaskCommand>
 
         if (task == null || task.SenderId != _requestContext.SenderId)
             throw new InvalidOperationException("Task not found or access denied.");
-
+        
+        var expectedVersion = task.Version;
         var utcNow = _dateTime.UtcNow;
         task.Pause(utcNow);
 
         _unitOfWork.Track(task);
 
-        await _taskRepo.UpdateAsync(task, cancellationToken);
-        await _dispatcher.DispatchAsync(task.DomainEvents, cancellationToken);
+        try
+        {
+            await _taskRepo.UpdateAsync(task, expectedVersion, cancellationToken);
+            await _dispatcher.DispatchAsync(task.DomainEvents, cancellationToken);
+        }
+        catch (ConcurrencyException)
+        {
+            throw;
+        }
     }
 }

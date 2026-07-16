@@ -1,5 +1,6 @@
 using Application.Commands;
 using Application.Interfaces;
+using Domain.Exceptions;
 using Domain.Interfaces;
 using Domain.ValueObjects;
 
@@ -41,14 +42,23 @@ public sealed class CancelTaskCommandHandler : ICommandHandler<CancelTaskCommand
 
         if (task == null || task.SenderId != _requestContext.SenderId)
             throw new InvalidOperationException("Task not found or access denied.");
-
+        
+        var expectedVersion = task.Version;  // фиксируем версию до изменения
         var utcNow = _dateTime.UtcNow;
         task.Cancel(utcNow);
 
         // Регистрируем агрегат для автоматической очистки событий при коммите
         _unitOfWork.Track(task);
 
-        await _taskRepo.UpdateAsync(task, cancellationToken);
-        await _dispatcher.DispatchAsync(task.DomainEvents, cancellationToken);
+        try
+        {
+            await _taskRepo.UpdateAsync(task, expectedVersion, cancellationToken);
+            await _dispatcher.DispatchAsync(task.DomainEvents, cancellationToken);
+        }
+        catch (ConcurrencyException)
+        {
+            // Можно пробросить выше, чтобы API вернул 409 Conflict
+            throw;
+        }
     }
 }

@@ -38,8 +38,15 @@ public interface ITaskRepository
     /// </summary>
     // Task<IReadOnlyList<ScheduledTask>> GetExecutingOlderThanAsync(TimeSpan timeout, CancellationToken cancellationToken = default);
 
-    /// <summary>Обновить существующее задание (статус, свойства).</summary>
-    Task UpdateAsync(ScheduledTask task, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Обновить задание с контролем оптимистичной блокировки.
+    /// Если версия задания в БД не совпадает с expectedVersion, 
+    /// реализация должна выбросить ConcurrencyException.
+    /// </summary>
+    /// <param name="task">Агрегат с изменённым состоянием.</param>
+    /// <param name="expectedVersion">Версия, которую ожидает клиент (та, что была при загрузке).</param>
+    /// <param name="cancellationToken">Токен отмены.</param>
+    Task UpdateAsync(ScheduledTask task, int expectedVersion, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Возвращает список заданий в статусе Executing, у которых LockedUntil <= utcNow.

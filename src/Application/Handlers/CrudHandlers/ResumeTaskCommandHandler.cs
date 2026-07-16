@@ -1,5 +1,6 @@
 using Application.Commands;
 using Application.Interfaces;
+using Domain.Exceptions;
 using Domain.Interfaces;
 using Domain.ValueObjects;
 
@@ -42,12 +43,21 @@ public sealed class ResumeTaskCommandHandler : ICommandHandler<ResumeTaskCommand
         if (task == null || task.SenderId != _requestContext.SenderId)
             throw new InvalidOperationException("Task not found or access denied.");
 
+        var expectedVersion = task.Version;
         var utcNow = _dateTime.UtcNow;
         task.Resume(utcNow);
 
         _unitOfWork.Track(task);
+        try
+        {
+            await _taskRepo.UpdateAsync(task,expectedVersion, cancellationToken);
+            await _dispatcher.DispatchAsync(task.DomainEvents, cancellationToken);
 
-        await _taskRepo.UpdateAsync(task, cancellationToken);
-        await _dispatcher.DispatchAsync(task.DomainEvents, cancellationToken);
+        }
+        catch (ConcurrencyException)
+        {
+            throw;
+        }
+         
     }
 }
