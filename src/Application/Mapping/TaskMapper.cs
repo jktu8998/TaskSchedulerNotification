@@ -30,8 +30,16 @@ public static class TaskMapper
             Retry = MapRetryPolicy(task.RetryPolicy),
             CurrentAttempt = task.CurrentAttempt,
             CreatedAt = new DateTimeOffset(task.CreatedAt, TimeSpan.Zero),
-            UpdatedAt = task.UpdatedAt.HasValue ? new DateTimeOffset(task.UpdatedAt.Value, TimeSpan.Zero) : null,
-            NextExecutionAt = task.NextExecutionAt.HasValue ? new DateTimeOffset(task.NextExecutionAt.Value, TimeSpan.Zero) : null
+            UpdatedAt = task.UpdatedAt.HasValue
+                ? new DateTimeOffset(task.UpdatedAt.Value, TimeSpan.Zero)
+                : null,
+            NextExecutionAt = task.NextExecutionAt.HasValue
+                ? new DateTimeOffset(task.NextExecutionAt.Value, TimeSpan.Zero)
+                : null,
+            RawPayload = task.RawPayload,
+            Metadata = task.Metadata.Data.Count > 0
+                ? task.Metadata.Data.ToDictionary(kvp => kvp.Key, kvp => kvp.Value)
+                : null 
         };
     }
 

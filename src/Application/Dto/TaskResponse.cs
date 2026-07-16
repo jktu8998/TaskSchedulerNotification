@@ -51,4 +51,14 @@ public sealed record TaskResponse
     /// null, если задание завершено/отменено или время не определено.
     /// </summary>
     public DateTimeOffset? NextExecutionAt { get; init; }
+    /// <summary>
+    /// Исходный JSON-запрос, сохранённый при создании задания.
+    /// Содержит все поля, включая нестандартные (ExtensionData).
+    /// </summary>
+    public string RawPayload { get; init; }
+
+    /// <summary>
+    /// Метаданные задания (ключ-значение), извлечённые из ExtensionData.
+    /// </summary>
+    public Dictionary<string, string>? Metadata { get; init; }
 }

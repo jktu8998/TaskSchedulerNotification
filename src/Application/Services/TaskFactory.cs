@@ -14,18 +14,24 @@ public sealed class TaskFactory : ITaskFactory
 
     public TaskFactory(IEncryptionService encryption) => _encryption = encryption;
 
-    public ScheduledTask CreateFromRequest(CreateTaskRequest request, string senderId, DateTime utcNow,string idempotencyKey)
+    public ScheduledTask CreateFromRequest(
+        CreateTaskRequest request,
+        string senderId, DateTime utcNow,
+        string idempotencyKey)
     {
         string? encrypted = null;
         if (!string.IsNullOrWhiteSpace(request.SensitiveData))
             encrypted = _encryption.Encrypt(request.SensitiveData);
-
+        
+        // 2. Сериализуем исходный DTO обратно в JSON, сохраняя все поля, включая ExtensionData
+        var rawPayload = JsonSerializer.Serialize(request);
+        
         return BuildTask(
             request.Type, request.Schedule, request.Execution,
             request.ResultDelivery, request.PollingConfig, request.Retry,
             encrypted, request.ExtensionData, senderId, utcNow,
             idempotencyKey, 
-            rawPayload: null);  // пока заглушка, позже заполним
+            rawPayload: rawPayload);   
     }
 
     public ScheduledTask CreateFromSnapshot(TaskSnapshotDto snapshot, string senderId, DateTime utcNow)
