@@ -57,8 +57,7 @@ public sealed class RunExecutionCommandHandler : ICommandHandler<RunExecutionCom
         // внутри вычислит LockedUntil = utcNow + (timeoutSeconds ?? 30) + 5.
         // -----------------------------------------------------------------
         var task = await _taskRepo.TryAcquireQueuedTaskAsync(taskId, utcNow, timeoutSeconds: null, cancellationToken);
-        if (task is null)
-            return; // задача уже захвачена, отменена или не существует
+        if (task is null) return; // задача уже захвачена, отменена или не существует
 
         // После захвата в задаче уже актуальный Status=Executing и LockedUntil
         // Можно выполнять HTTP-запрос
@@ -95,9 +94,9 @@ public sealed class RunExecutionCommandHandler : ICommandHandler<RunExecutionCom
             {
                 if (task.Type == TaskType.Periodic)
                 {
-                    var nextExecutionAt = task.Schedule.GetNextOccurrence(utcNow)
-                        ?? throw new InvalidOperationException("Cron expression has no future occurrences.");
-                    task.Reschedule(utcNow, nextExecutionAt);
+                    // var nextExecutionAt = task.Schedule.GetNextOccurrence(utcNow)
+                    //     ?? throw new InvalidOperationException("Cron expression has no future occurrences.");
+                    task.Reschedule(utcNow);
                 }
                 else
                 {
@@ -110,19 +109,16 @@ public sealed class RunExecutionCommandHandler : ICommandHandler<RunExecutionCom
 
                 if (task.Status == StatusTask.Failed)
                 {
-                    var attemptIndex = task.CurrentAttempt - 1;
-                    var baseInterval = attemptIndex >= 0 && attemptIndex < task.RetryPolicy.IntervalsSeconds.Length
-                        ? TimeSpan.FromSeconds(task.RetryPolicy.IntervalsSeconds[attemptIndex])
-                        : TimeSpan.FromMinutes(1);
+                    var delay = task.RetryPolicy.GetRetryDelay(task.CurrentAttempt);
                     var jitter = TimeSpan.FromSeconds(_random.Next(0, 16));
-                    var nextRetryAt = utcNow + baseInterval + jitter;
-                    task.ScheduleRetry(utcNow, nextRetryAt);
+                    task.ScheduleRetry(utcNow, delay + jitter);
                 }
                 else if (task.Status == StatusTask.Dead)
                 {
                     // Создаём DTO-снапшот
                     var snapshotDto = new TaskSnapshotDto
                     {
+                        IdempotencyKey = task.IdempotencyKey,
                         SenderId = task.SenderId.ToString(),
                         Type = task.Type.ToString(),
                         Schedule = new ScheduleDto
@@ -161,10 +157,9 @@ public sealed class RunExecutionCommandHandler : ICommandHandler<RunExecutionCom
                 }
             }
 
-            _unitOfWork.Track(task);
-            await _taskRepo.UpdateAsync(task, cancellationToken);
+            _unitOfWork.Track(task);// возможно оно не на своем месте и должно быть после коммита 
+            await _taskRepo.UpdateAsync(task,task.Version, cancellationToken);
             await _dispatcher.DispatchAsync(task.DomainEvents, cancellationToken);
-
             await _unitOfWork.CommitAsync(cancellationToken);
         }
         catch

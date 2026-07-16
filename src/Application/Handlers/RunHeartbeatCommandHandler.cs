@@ -44,8 +44,7 @@ public sealed class RunHeartbeatCommandHandler : ICommandHandler<RunHeartbeatCom
         var utcNow = _dateTime.UtcNow;
         var staleTasks = await _taskRepo.GetStaleExecutingTasksAsync(utcNow, cancellationToken);
 
-        if (staleTasks.Count == 0)
-            return;
+        if (staleTasks.Count == 0) return;
 
         var tasksToUpdate = new List<ScheduledTask>(staleTasks.Count);
         var dlqEntries = new List<DeadLetterEntry>();
@@ -57,14 +56,9 @@ public sealed class RunHeartbeatCommandHandler : ICommandHandler<RunHeartbeatCom
 
             if (task.Status == StatusTask.Failed)
             {
-                // Вычисляем время следующей попытки с Jitter
-                var attemptIndex = task.CurrentAttempt - 1;
-                var baseInterval = attemptIndex < task.RetryPolicy.IntervalsSeconds.Length
-                    ? TimeSpan.FromSeconds(task.RetryPolicy.IntervalsSeconds[attemptIndex])
-                    : TimeSpan.FromMinutes(1);
+                var delay = task.RetryPolicy.GetRetryDelay(task.CurrentAttempt);
                 var jitter = TimeSpan.FromSeconds(_random.Next(0, 16));
-                var nextRetryAt = utcNow + baseInterval + jitter;
-                task.ScheduleRetry(utcNow, nextRetryAt);
+                task.ScheduleRetry(utcNow, delay + jitter);
             }
             else if (task.Status == StatusTask.Dead)
             {
@@ -72,6 +66,7 @@ public sealed class RunHeartbeatCommandHandler : ICommandHandler<RunHeartbeatCom
                 // Создаём DTO-снапшот и сериализуем его
                 var snapshotDto = new TaskSnapshotDto
                 {
+                    IdempotencyKey = task.IdempotencyKey,
                     SenderId = task.SenderId.ToString(),
                     Type = task.Type.ToString(),
                     Schedule = new ScheduleDto
