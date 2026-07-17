@@ -3,7 +3,7 @@ using Application.Interfaces;
 using Domain.DomainEvents;
 using Domain.Entities;
 using Domain.Interfaces;
-
+using Microsoft.Extensions.Logging;
 namespace Application.DomainEventHandlers;
 
 /// <summary>
@@ -16,14 +16,19 @@ public sealed class UniversalEventLogger<TEvent> : IDomainEventHandler<TEvent>
 {
     private readonly ITaskLogRepository _logRepo;
     private readonly IDateTimeProvider _dateTime;
+    private readonly ILogger<UniversalEventLogger<TEvent>> _logger;
 
     // Статическое поле инициализируется один раз для каждого типа TEvent
     private static readonly string EventType = typeof(TEvent).Name.Replace("Event", "");
 
-    public UniversalEventLogger(ITaskLogRepository logRepo, IDateTimeProvider dateTime)
+    public UniversalEventLogger(
+        ITaskLogRepository logRepo,
+        IDateTimeProvider dateTime,
+        ILogger<UniversalEventLogger<TEvent>> logger)
     {
         _logRepo = logRepo;
         _dateTime = dateTime;
+        _logger = logger;
     }
 
     public async Task HandleAsync(TEvent domainEvent, CancellationToken cancellationToken = default)
@@ -37,6 +42,15 @@ public sealed class UniversalEventLogger<TEvent> : IDomainEventHandler<TEvent>
             _dateTime.UtcNow,
             details: detailsJson); // Пишем контекст в лог
 
-        await _logRepo.AddAsync(log, cancellationToken);
+        try
+        {
+            await _logRepo.AddAsync(log, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to write task log for event {EventType} on task {TaskId}",
+                EventType, domainEvent.TaskId);
+            // Не пробрасываем исключение — логирование не должно ломать бизнес-операцию
+        }
     }
 }
