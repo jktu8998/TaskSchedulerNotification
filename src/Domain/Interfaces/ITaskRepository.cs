@@ -31,6 +31,8 @@ public interface ITaskRepository
     /// Используется планировщиком для отправки в очередь.
     /// </summary>
     Task<IReadOnlyList<ScheduledTask>> GetScheduledBeforeAsync(DateTime cutoff, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ScheduledTask>> GetScheduledBeforeAsync(
+        DateTime cutoff, int batchSize, CancellationToken cancellationToken);
 
     /// <summary>
     /// Получить задания в статусе Executing, которые висят дольше указанного времени.
