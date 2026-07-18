@@ -37,7 +37,7 @@ public sealed class RunPollingCheckCommandHandler : ICommandHandler<RunPollingCh
         _dispatcher = dispatcher;
         _outboxRepo = outboxRepo;
     }
-
+    //TODO:проблема N+1 нужно будет решить её тут 
     public async Task HandleAsync(RunPollingCheckCommand command, CancellationToken cancellationToken = default)
     {
         var utcNow = _dateTime.UtcNow;

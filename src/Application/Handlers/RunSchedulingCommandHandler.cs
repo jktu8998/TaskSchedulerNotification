@@ -38,11 +38,10 @@ public sealed class RunSchedulingCommandHandler : ICommandHandler<RunSchedulingC
     public async Task HandleAsync(RunSchedulingCommand command, CancellationToken cancellationToken = default)
     {
         var utcNow = _dateTime.UtcNow;
-        while (true) //выглядит сомнительно, но пока оставлю так 
-        {
+        
             var readyTasks = await _taskRepo.GetScheduledBeforeAsync(utcNow, BatchSize, cancellationToken);
 
-            if (readyTasks.Count == 0) break;
+            if (readyTasks.Count == 0) return;
                 // return;
 
             var tasksToUpdate = new List<ScheduledTask>(readyTasks.Count);
@@ -87,6 +86,5 @@ public sealed class RunSchedulingCommandHandler : ICommandHandler<RunSchedulingC
                 await _unitOfWork.RollbackAsync(cancellationToken);
                 throw;
             }
-        }
     }
 }
