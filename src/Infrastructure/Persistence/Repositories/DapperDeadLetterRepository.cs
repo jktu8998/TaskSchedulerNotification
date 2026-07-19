@@ -1,7 +1,7 @@
- 
 using Dapper;
 using Domain.Entities;
 using Domain.Interfaces;
+using Domain.ValueObjects;
 
 namespace Infrastructure.Persistence.Repositories;
 
@@ -18,10 +18,8 @@ public sealed class DapperDeadLetterRepository : IDeadLetterRepository
     {
         const string sql = @"
             INSERT INTO dead_letter_queue (task_id, sender_id, 
-                                           original_task_snapshot, 
-                                           error_details, moved_at)
-            VALUES (@TaskId, @SenderId, 
-                    @OriginalTaskSnapshot::jsonb, 
+                                           original_task_snapshot, error_details, moved_at)
+            VALUES (@TaskId, @SenderId, @OriginalTaskSnapshot::jsonb, 
                     @ErrorDetails, @MovedAt)";
 
         await _db.Connection.ExecuteAsync(sql, new
@@ -38,8 +36,7 @@ public sealed class DapperDeadLetterRepository : IDeadLetterRepository
     {
         const string sql = @"
             SELECT id, task_id, sender_id, 
-                   original_task_snapshot, 
-                   error_details, moved_at 
+                   original_task_snapshot, error_details, moved_at 
             FROM dead_letter_queue 
             WHERE id = @Id";
 
@@ -49,20 +46,20 @@ public sealed class DapperDeadLetterRepository : IDeadLetterRepository
         }, transaction: _db.Transaction);
     }
 
-    public async Task<IReadOnlyList<DeadLetterEntry>> GetBySenderIdAsync(string senderId, int skip, int take, CancellationToken ct = default)
+    public async Task<IReadOnlyList<DeadLetterEntry>> GetBySenderIdAsync(
+        SenderId senderId, int skip, int take, CancellationToken ct = default)
     {
         const string sql = @"
-            SELECT id, task_id, sender_id, 
-                   original_task_snapshot, 
-                   error_details, moved_at
-            FROM dead_letter_queue
-            WHERE sender_id = @SenderId
-            ORDER BY moved_at DESC
-            LIMIT @Take OFFSET @Skip";
+        SELECT id, task_id, sender_id, 
+               original_task_snapshot, error_details, moved_at
+        FROM dead_letter_queue 
+        WHERE sender_id = @SenderId 
+        ORDER BY moved_at DESC 
+        LIMIT @Take OFFSET @Skip";
 
         var result = await _db.Connection.QueryAsync<DeadLetterEntry>(sql, new
         {
-            SenderId = senderId,
+            SenderId = senderId.Value,  // используем значение из value object
             Skip = skip,
             Take = take
         }, transaction: _db.Transaction);
@@ -74,10 +71,9 @@ public sealed class DapperDeadLetterRepository : IDeadLetterRepository
     {
         const string sql = @"
             SELECT id, task_id, sender_id, 
-                   original_task_snapshot, 
-                   error_details, moved_at
-            FROM dead_letter_queue
-            ORDER BY moved_at DESC
+                   original_task_snapshot, error_details, moved_at
+            FROM dead_letter_queue 
+            ORDER BY moved_at DESC 
             LIMIT @Take OFFSET @Skip";
 
         var result = await _db.Connection.QueryAsync<DeadLetterEntry>(sql, new
@@ -97,5 +93,14 @@ public sealed class DapperDeadLetterRepository : IDeadLetterRepository
         {
             Id = id
         }, transaction: _db.Transaction);
+    }
+
+    // НОВЫЙ метод пакетной вставки
+    public async Task BulkAddAsync(IReadOnlyCollection<DeadLetterEntry> entries, CancellationToken ct = default)
+    {
+        foreach (var entry in entries)
+        {
+            await AddAsync(entry, ct);
+        }
     }
 }
