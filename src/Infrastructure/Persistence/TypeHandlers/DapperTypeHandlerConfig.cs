@@ -27,10 +27,10 @@ public static class DapperTypeHandlerConfig
         SqlMapper.AddTypeHandler(new EnumTypeHandler<ResultDeliveryMode>());
         
         // Value Objects ↔ JSONB
-        SqlMapper.AddTypeHandler(new JsonbTypeHandler<Schedule>());
-        SqlMapper.AddTypeHandler(new JsonbTypeHandler<ExecutionConfig>());
-        SqlMapper.AddTypeHandler(new JsonbTypeHandler<ResultDeliveryConfig>());
-        SqlMapper.AddTypeHandler(new JsonbTypeHandler<PollingConfig>());
-        SqlMapper.AddTypeHandler(new JsonbTypeHandler<RetryPolicy>());
+        SqlMapper.AddTypeHandler(new SystemTextJsonbTypeHandler<Schedule>());
+        SqlMapper.AddTypeHandler(new SystemTextJsonbTypeHandler<ExecutionStrategy>());
+        SqlMapper.AddTypeHandler(new SystemTextJsonbTypeHandler<ResultDeliveryConfig>());
+        SqlMapper.AddTypeHandler(new SystemTextJsonbTypeHandler<PollingConfig>());
+        SqlMapper.AddTypeHandler(new SystemTextJsonbTypeHandler<RetryPolicy>());
     }
 }
