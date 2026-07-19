@@ -30,7 +30,7 @@ public interface ITaskRepository
     /// Получить задания, у которых статус Scheduled и время выполнения наступило.
     /// Используется планировщиком для отправки в очередь.
     /// </summary>
-    Task<IReadOnlyList<ScheduledTask>> GetScheduledBeforeAsync(DateTime cutoff, CancellationToken cancellationToken = default);
+   // Task<IReadOnlyList<ScheduledTask>> GetScheduledBeforeAsync(DateTime cutoff, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ScheduledTask>> GetScheduledBeforeAsync(
         DateTime cutoff, int batchSize, CancellationToken cancellationToken);
 
