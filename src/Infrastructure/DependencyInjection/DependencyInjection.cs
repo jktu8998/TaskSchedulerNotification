@@ -1,4 +1,3 @@
-
 using Application.Interfaces;
 using Domain.Interfaces;
 using Infrastructure.BackgroundServices;
@@ -22,12 +21,9 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        // --------------------------------------------------
         // 1. Dapper Type Handlers (один раз при старте)
-        // --------------------------------------------------
         DapperTypeHandlerConfig.Register();
 
-        // --------------------------------------------------
         // 2. Persistence
         // --------------------------------------------------
         // Фабрика подключений (Singleton, stateless)
@@ -59,27 +55,21 @@ public static class DependencyInjection
             ?? throw new InvalidOperationException("Encryption key is required.");
         services.AddSingleton<IEncryptionService>(new AesEncryptionService(encryptionKey));
 
-        // --------------------------------------------------
         // 4. Network
-        // --------------------------------------------------
-        services.AddHttpClient("TaskExecutor"); // IHttpClientFactory
+        services.AddHttpClient("TaskExecutor");
         services.AddSingleton<IHttpExecutor, HttpClientExecutor>();
 
-        // --------------------------------------------------
         // 5. Messaging (RabbitMQ)
-        // --------------------------------------------------
         var rabbitMqConnectionString = configuration.GetConnectionString("RabbitMQ")
             ?? throw new InvalidOperationException("RabbitMQ connection string is required.");
-        // Регистрируем IMessageQueue как Singleton – ленивое подключение внутри
         services.AddSingleton<IMessageQueue>(new RabbitMqMessageQueue(rabbitMqConnectionString));
 
-        // --------------------------------------------------
         // 6. Background Services
-        // --------------------------------------------------
         services.AddHostedService<OutboxProcessorWorker>();
         services.AddHostedService<SchedulerWorker>();
         services.AddHostedService<HeartbeatWorker>();
         services.AddHostedService<TaskExecutionWorker>();
+        services.AddHostedService<PollingWorker>();   
 
         return services;
     }

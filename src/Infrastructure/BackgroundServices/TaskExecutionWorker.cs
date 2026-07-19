@@ -1,7 +1,7 @@
-
 using System.Text;
+using System.Text.Json;
 using Application.Commands;
-using Application.Handlers;
+using Application.Interfaces;
 using Domain.ValueObjects;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,7 +18,13 @@ public sealed class TaskExecutionWorker : BackgroundService
     private readonly ILogger<TaskExecutionWorker> _logger;
     private readonly string _rabbitMqConnectionString;
 
-    public TaskExecutionWorker(IServiceScopeFactory scopeFactory, IConfiguration configuration, ILogger<TaskExecutionWorker> logger)
+    // Структура сообщения для расширяемости
+    private sealed record TaskExecutionMessage(Guid TaskId);
+
+    public TaskExecutionWorker(
+        IServiceScopeFactory scopeFactory,
+        IConfiguration configuration,
+        ILogger<TaskExecutionWorker> logger)
     {
         _scopeFactory = scopeFactory;
         _logger = logger;
@@ -37,13 +43,10 @@ public sealed class TaskExecutionWorker : BackgroundService
             NetworkRecoveryInterval = TimeSpan.FromSeconds(5)
         };
 
-        // ИСПРАВЛЕНИЕ: Используем await using для корректного асинхронного освобождения ресурсов в v7
         await using var connection = await factory.CreateConnectionAsync(stoppingToken);
-        
         var options = new CreateChannelOptions(
             publisherConfirmationsEnabled: false,
-            publisherConfirmationTrackingEnabled: false
-        );
+            publisherConfirmationTrackingEnabled: false);
         await using var channel = await connection.CreateChannelAsync(options, stoppingToken);
 
         await channel.QueueDeclareAsync(
@@ -53,7 +56,6 @@ public sealed class TaskExecutionWorker : BackgroundService
             autoDelete: false,
             cancellationToken: stoppingToken);
 
-        // Гарантируем, что воркер берет только 1 задачу за раз
         await channel.BasicQosAsync(prefetchSize: 0, prefetchCount: 1, global: false, cancellationToken: stoppingToken);
 
         var consumer = new AsyncEventingBasicConsumer(channel);
@@ -63,58 +65,53 @@ public sealed class TaskExecutionWorker : BackgroundService
             try
             {
                 var body = ea.Body.ToArray();
-                var message = Encoding.UTF8.GetString(body);
-                
-                // ИСПРАВЛЕНИЕ: Убираем кавычки от JSON-сериализации перед парсингом
-                var cleanMessage = message.Trim('"');
-                
-                if (!Guid.TryParse(cleanMessage, out var taskGuid))
+                var json = Encoding.UTF8.GetString(body);
+
+                // Десериализуем JSON-сообщение
+                var message = JsonSerializer.Deserialize<TaskExecutionMessage>(json);
+                if (message is null)
                 {
-                    _logger.LogWarning("Получено некорректное сообщение: {Message}", message);
-                    // Ошибочный формат - удаляем из очереди (requeue: false неявно в BasicAck/Reject)
+                    _logger.LogWarning("Получено некорректное сообщение: {Json}", json);
                     await channel.BasicAckAsync(ea.DeliveryTag, false, stoppingToken);
                     return;
                 }
 
-                var taskId = TaskId.From(taskGuid);
+                var taskId = TaskId.From(message.TaskId);
                 _logger.LogDebug("Получено задание {TaskId}", taskId.Value);
 
                 using var scope = _scopeFactory.CreateScope();
                 var handler = scope.ServiceProvider.GetRequiredService<ICommandHandler<RunExecutionCommand>>();
 
-                // Запускаем выполнение
                 await handler.HandleAsync(new RunExecutionCommand(taskId.Value), stoppingToken);
-
-                // Если всё прошло без исключений, подтверждаем обработку
                 await channel.BasicAckAsync(ea.DeliveryTag, false, stoppingToken);
                 _logger.LogDebug("Задание {TaskId} успешно обработано", taskId.Value);
+            }
+            catch (JsonException ex)
+            {
+                _logger.LogError(ex, "Некорректный JSON в сообщении. Сообщение удалено из очереди.");
+                await channel.BasicAckAsync(ea.DeliveryTag, false, stoppingToken);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Ошибка обработки задания из очереди");
-                
-                // ИСПРАВЛЕНИЕ: Пауза 1 секунда, чтобы защититься от бесконечного цикла Poison Message
                 try { await Task.Delay(1000, stoppingToken); } catch { /* игнор */ }
-                
-                // Возвращаем задачу в очередь
                 await channel.BasicNackAsync(ea.DeliveryTag, false, requeue: true, stoppingToken);
             }
         };
 
         await channel.BasicConsumeAsync(
             queue: "task_execution_queue",
-            autoAck: false, // Важно! Ручное подтверждение
+            autoAck: false,
             consumer: consumer,
             cancellationToken: stoppingToken);
 
-        // ИСПРАВЛЕНИЕ: Безопасное ожидание остановки приложения
         try
         {
             await Task.Delay(Timeout.Infinite, stoppingToken);
         }
         catch (TaskCanceledException)
         {
-            // Штатная остановка приложения
+            // Штатная остановка
         }
 
         _logger.LogInformation("TaskExecutionWorker остановлен");

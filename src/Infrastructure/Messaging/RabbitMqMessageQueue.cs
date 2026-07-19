@@ -1,5 +1,6 @@
 
 using System.Text;
+using System.Text.Json;
 using Application.Interfaces;
 using Domain.ValueObjects;
 using RabbitMQ.Client;
@@ -68,21 +69,18 @@ public sealed class RabbitMqMessageQueue : IMessageQueue, IAsyncDisposable
 
     public async Task PublishScheduledTaskAsync(TaskId taskId, CancellationToken ct = default)
     {
-        // Подключаемся только в момент отправки
         await EnsureConnectedAsync(ct);
 
-        // Маленькая оптимизация: ToString() для Guid быстрее и чище, чем сериализация в JSON
-        var message = taskId.Value.ToString();
+        var message = JsonSerializer.Serialize(new { TaskId = taskId.Value });
         var body = Encoding.UTF8.GetBytes(message);
 
         var props = new BasicProperties
         {
-            DeliveryMode = DeliveryModes.Persistent 
+            DeliveryMode = DeliveryModes.Persistent
         };
 
         try
         {
-            // Библиотека сама дождется ACK благодаря включенному трекингу
             await _channel!.BasicPublishAsync(
                 exchange: "",
                 routingKey: QueueName,
@@ -93,7 +91,6 @@ public sealed class RabbitMqMessageQueue : IMessageQueue, IAsyncDisposable
         }
         catch (PublishException ex)
         {
-            // Сюда мы попадем, если брокер вернул NACK или сообщение не дошло (аналог "OrDie")
             throw new InvalidOperationException($"Сообщение не было подтверждено брокером RabbitMQ: {ex.Message}", ex);
         }
     }

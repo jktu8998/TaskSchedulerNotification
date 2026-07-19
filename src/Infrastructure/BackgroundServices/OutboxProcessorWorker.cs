@@ -1,4 +1,4 @@
-
+using System.Text.Json;
 using Application.Interfaces;
 using Domain.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
@@ -7,10 +7,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Infrastructure.BackgroundServices;
 
-/// <summary>
-/// Фоновый воркер, который забирает необработанные сообщения из таблицы Outbox,
-/// публикует их в RabbitMQ и удаляет после успешной отправки.
-/// </summary>
 public sealed class OutboxProcessorWorker : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
@@ -32,11 +28,10 @@ public sealed class OutboxProcessorWorker : BackgroundService
             try
             {
                 using var scope = _scopeFactory.CreateScope();
-                
-                // Достаем UnitOfWork для управления транзакцией
                 var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
                 var outboxRepo = scope.ServiceProvider.GetRequiredService<IOutboxRepository>();
                 var messageQueue = scope.ServiceProvider.GetRequiredService<IMessageQueue>();
+                var httpExecutor = scope.ServiceProvider.GetRequiredService<IHttpExecutor>();
 
                 // 1. Открываем транзакцию. Это критично для FOR UPDATE SKIP LOCKED
                 await uow.BeginTransactionAsync(stoppingToken);
@@ -57,38 +52,91 @@ public sealed class OutboxProcessorWorker : BackgroundService
                 {
                     try
                     {
-                        // Публикуем в RabbitMQ (в v7.x метод ждет ACK)
-                        await messageQueue.PublishScheduledTaskAsync(message.TaskId, stoppingToken);
+                        bool processed = message.EventType switch
+                        {
+                            "TaskQueuedEvent" or "TaskScheduledEvent" => await PublishToQueueAsync(message, messageQueue, stoppingToken),
+                            "ResultDeliveryRequested" => await DeliverResultAsync(message, httpExecutor, stoppingToken),
+                            _ => false
+                        };
 
-                        // Успешно — помечаем на удаление в рамках текущей транзакции БД
-                        await outboxRepo.RemoveAsync(message.Id, stoppingToken);
-
-                        _logger.LogDebug("Сообщение {OutboxId} для задания {TaskId} отправлено", message.Id, message.TaskId);
+                        if (processed)
+                        {
+                            await outboxRepo.RemoveAsync(message.Id, stoppingToken);
+                            _logger.LogDebug("Outbox-сообщение {OutboxId} обработано", message.Id);
+                        }
+                        else
+                        {
+                            // Неудача – увеличиваем счётчик попыток
+                            if (message.TryIncrementRetry())
+                            {
+                                await outboxRepo.UpdateAsync(message, stoppingToken);
+                                _logger.LogWarning("Повторная попытка для Outbox {OutboxId}", message.Id);
+                            }
+                            else
+                            {
+                                // Лимит исчерпан – удаляем без выполнения
+                                await outboxRepo.RemoveAsync(message.Id, stoppingToken);
+                                _logger.LogError("Outbox-сообщение {OutboxId} не обработано, лимит попыток исчерпан", message.Id);
+                            }
+                        }
                     }
                     catch (Exception ex)
                     {
-                        // Если RabbitMQ недоступен или вернул NACK, логируем ошибку.
-                        // Метод RemoveAsync не вызовется, сообщение останется в БД.
-                        _logger.LogWarning(ex, "Не удалось обработать Outbox-сообщение {OutboxId}", message.Id);
+                        _logger.LogError(ex, "Ошибка обработки Outbox-сообщения {OutboxId}", message.Id);
                     }
                 }
 
-                // 4. Фиксируем удаления (или откатываем, если всё упало). 
-                // Блокировка FOR UPDATE снимается именно здесь.
                 await uow.CommitAsync(stoppingToken);
             }
             catch (TaskCanceledException)
             {
-                // Игнорируем исключение при штатной остановке приложения
+                // штатная остановка
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Критическая ошибка в цикле OutboxProcessorWorker");
-                // Пауза перед ретраем, чтобы при падении БД не спамить логи тысячами ошибок в секунду
-                await Task.Delay(_pollingInterval, stoppingToken); 
+                await Task.Delay(_pollingInterval, stoppingToken);
             }
         }
 
         _logger.LogInformation("OutboxProcessorWorker остановлен");
     }
+
+    private async Task<bool> PublishToQueueAsync(Domain.Entities.OutboxMessage message, IMessageQueue queue, CancellationToken ct)
+    {
+        try
+        {
+            await queue.PublishScheduledTaskAsync(message.TaskId, ct);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Не удалось опубликовать задание {TaskId} в очередь", message.TaskId);
+            return false;
+        }
+    }
+
+    private async Task<bool> DeliverResultAsync(Domain.Entities.OutboxMessage message, IHttpExecutor executor, CancellationToken ct)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(message.Payload)) return false;
+
+            // Десериализуем параметры доставки
+            var delivery = JsonSerializer.Deserialize<ResultDeliveryPayload>(message.Payload);
+            if (delivery == null) return false;
+
+            var config = new HttpRequestConfig(delivery.Method, delivery.Url, null, delivery.Body);
+            var response = await executor.ExecuteAsync(config, ct);
+            return response.IsSuccess;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Ошибка доставки результата для задания {TaskId}", message.TaskId);
+            return false;
+        }
+    }
+
+    // Вспомогательный класс для десериализации payload доставки
+    private sealed record ResultDeliveryPayload(string Mode, string Url, string Method, string? Body);
 }
