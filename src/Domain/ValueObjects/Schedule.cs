@@ -57,8 +57,8 @@ public sealed record Schedule
         }
 
         // Если timezone задана, проверить её существование
-        ///На уровне инфраструктуры в Dockerfile
-        /// обязательно нужно гарантировать установку пакета tzdata
+        // На уровне инфраструктуры в Dockerfile
+        // обязательно нужно гарантировать установку пакета tzdata
         if (!string.IsNullOrWhiteSpace(timezone))
         {
             if (!TimeZoneInfo.TryFindSystemTimeZoneById(timezone, out _))
@@ -73,7 +73,7 @@ public sealed record Schedule
         // _parsedCron оставляем null — заполнится лениво
     }
 
-    // Статические фабрики (без изменений)
+    // Статические фабрики
     public static Schedule FromAbsolute(DateTimeOffset executeAt)
         => new(executeAt, null, null, null);
 

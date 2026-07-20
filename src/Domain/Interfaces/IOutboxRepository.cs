@@ -45,7 +45,7 @@ public interface IOutboxRepository
     
     /// <summary>
     /// Обновить существующее сообщение (например, увеличить счётчик попыток).
-    /// Используется после неудачной доставки, если RetryCount < MaxRetries.
+    /// Используется после неудачной доставки, если RetryCount < MaxRetries .
     /// </summary>
     Task UpdateAsync(OutboxMessage message, CancellationToken cancellationToken = default);
 }

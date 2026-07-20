@@ -19,5 +19,5 @@ public interface IMessageQueue
     /// Потребитель очереди реализован как самостоятельный фоновый воркер TaskExecutionWorker,
     /// который напрямую работает с RabbitMQ через AsyncEventingBasicConsumer 
     /// </summary>
-    Task SubscribeAsync(Func<TaskId, CancellationToken, Task> handler, CancellationToken cancellationToken = default);
+    //Task SubscribeAsync(Func<TaskId, CancellationToken, Task> handler, CancellationToken cancellationToken = default);
 }

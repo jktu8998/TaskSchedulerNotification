@@ -4,8 +4,8 @@
 
 -- 1. Основная таблица заданий
 CREATE TABLE IF NOT EXISTS tasks (
-                                     id                      UUID PRIMARY KEY,
-                                     sender_id               VARCHAR(128) NOT NULL,
+    id                      UUID PRIMARY KEY,
+    sender_id               VARCHAR(128) NOT NULL,
     idempotency_key         VARCHAR(128) NOT NULL,
     type                    INTEGER NOT NULL,          -- TaskType enum
     status                  INTEGER NOT NULL,          -- StatusTask enum
@@ -28,9 +28,9 @@ CREATE TABLE IF NOT EXISTS tasks (
 
 -- 2. Таблица исходящих сообщений (Transactional Outbox)
 CREATE TABLE IF NOT EXISTS outbox_messages (
-                                               id              UUID PRIMARY KEY,
-                                               task_id         UUID NOT NULL,
-                                               event_type      VARCHAR(256) NOT NULL,
+    id              UUID PRIMARY KEY,
+    task_id         UUID NOT NULL,
+    event_type      VARCHAR(256) NOT NULL,
     payload         JSONB NULL,
     created_at      TIMESTAMPTZ NOT NULL,
     retry_count     INTEGER NOT NULL DEFAULT 0,
@@ -39,9 +39,9 @@ CREATE TABLE IF NOT EXISTS outbox_messages (
 
 -- 3. Таблица Dead Letter Queue
 CREATE TABLE IF NOT EXISTS dead_letter_queue (
-                                                 id                      BIGSERIAL PRIMARY KEY,
-                                                 task_id                 UUID NOT NULL,
-                                                 sender_id               VARCHAR(128) NOT NULL,
+    id                      BIGSERIAL PRIMARY KEY,
+    task_id                 UUID NOT NULL,
+    sender_id               VARCHAR(128) NOT NULL,
     original_task_snapshot  JSONB NOT NULL,
     error_details           TEXT NULL,
     moved_at                TIMESTAMPTZ NOT NULL
@@ -49,17 +49,17 @@ CREATE TABLE IF NOT EXISTS dead_letter_queue (
 
 -- 4. Таблица состояний для polling-заданий
 CREATE TABLE IF NOT EXISTS polling_states (
-                                              task_id             UUID PRIMARY KEY,
-                                              last_response_json  TEXT NULL,
-                                              last_checked_at     TIMESTAMPTZ NULL
+   task_id             UUID PRIMARY KEY,
+   last_response_json  TEXT NULL,
+   last_checked_at     TIMESTAMPTZ NULL
 );
 
 -- 5. Таблица логов заданий
 CREATE TABLE IF NOT EXISTS task_logs (
-                                         id          BIGSERIAL PRIMARY KEY,
-                                         task_id     UUID NOT NULL,
-                                         timestamp   TIMESTAMPTZ NOT NULL,
-                                         event_type  VARCHAR(256) NOT NULL,
+    id          BIGSERIAL PRIMARY KEY,
+    task_id     UUID NOT NULL,
+    timestamp   TIMESTAMPTZ NOT NULL,
+    event_type  VARCHAR(256) NOT NULL,
     message     TEXT NULL,
     details     TEXT NULL
     );

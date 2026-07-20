@@ -8,7 +8,7 @@ namespace Application.Mapping;
 /// <summary>
 /// Статический маппер для преобразования доменных объектов в DTO ответов API.
 /// Не содержит зависимостей от инфраструктуры (шифрование, БД).
-/// Для создания агрегатов будет использоваться внедряемый ITaskFactory (шаг 6).
+/// Для создания агрегатов будет использоваться внедряемый ITaskFactory .
 /// </summary>
 public static class TaskMapper
 {
@@ -20,7 +20,7 @@ public static class TaskMapper
         return new TaskResponse
         {
             Id = task.Id.Value,
-            SenderId = task.SenderId.ToString(), // Явное приведение к строке
+            SenderId = task.SenderId.ToString(), 
             Type = task.Type.ToString(),
             Status = task.Status.ToString(),
             Schedule = MapSchedule(task.Schedule),
@@ -102,17 +102,13 @@ public static class TaskMapper
                 dto.Headers,
                 dto.Body,
                 dto.TimeoutSeconds),
-            // будущие типы: "grpc" => new GrpcExecutionConfig(...)
+            // TODO будущие типы: "grpc" => new GrpcExecutionConfig(...)
             _ => throw new ArgumentException($"Unsupported execution type: {type}")
         };
     }
-    public static ExecutionConfigDto MapExecutionToDto(ExecutionStrategy strategy) => MapExecutionConfig(strategy);
-    // public static ExecutionConfigDto MapExecutionToDto(ExecutionStrategy strategy)
-    // {
-    //     return MapExecutionConfig(strategy); // уже есть приватный метод
-    // }
 
     // Приватные хелперы маппинга составных частей ответа
+    private static ExecutionConfigDto MapExecutionToDto(ExecutionStrategy strategy) => MapExecutionConfig(strategy);
 
     private static ScheduleDto MapSchedule(Schedule schedule) => new()
     {
@@ -169,7 +165,7 @@ public static class TaskMapper
     };
 
     //потом можно добавить недели и месяцы 
-    public static string FormatOffset(TimeSpan offset)
+    private static string FormatOffset(TimeSpan offset)
     {
         if (offset.TotalSeconds == 0) return "0s";
         if (offset.TotalDays >= 1 && offset.TotalDays % 1 == 0) return $"{(int)offset.TotalDays}d";

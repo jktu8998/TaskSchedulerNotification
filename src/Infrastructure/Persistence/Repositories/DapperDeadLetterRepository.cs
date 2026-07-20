@@ -17,10 +17,10 @@ public sealed class DapperDeadLetterRepository : IDeadLetterRepository
     public async Task AddAsync(DeadLetterEntry entry, CancellationToken ct = default)
     {
         const string sql = @"
-            INSERT INTO dead_letter_queue (task_id, sender_id, 
-                                           original_task_snapshot, error_details, moved_at)
-            VALUES (@TaskId, @SenderId, @OriginalTaskSnapshot::jsonb, 
-                    @ErrorDetails, @MovedAt)";
+            INSERT INTO dead_letter_queue 
+                (task_id, sender_id,  original_task_snapshot, error_details, moved_at)
+            VALUES 
+                (@TaskId, @SenderId, @OriginalTaskSnapshot::jsonb, @ErrorDetails, @MovedAt)";
 
         await _db.Connection.ExecuteAsync(sql, new
         {
@@ -36,7 +36,7 @@ public sealed class DapperDeadLetterRepository : IDeadLetterRepository
     {
         const string sql = @"
             SELECT id, task_id, sender_id, 
-                   original_task_snapshot, error_details, moved_at 
+             original_task_snapshot, error_details, moved_at 
             FROM dead_letter_queue 
             WHERE id = @Id";
 
@@ -51,7 +51,7 @@ public sealed class DapperDeadLetterRepository : IDeadLetterRepository
     {
         const string sql = @"
         SELECT id, task_id, sender_id, 
-               original_task_snapshot, error_details, moved_at
+         original_task_snapshot, error_details, moved_at
         FROM dead_letter_queue 
         WHERE sender_id = @SenderId 
         ORDER BY moved_at DESC 

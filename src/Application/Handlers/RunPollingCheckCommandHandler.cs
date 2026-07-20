@@ -95,7 +95,7 @@ public sealed class RunPollingCheckCommandHandler : ICommandHandler<RunPollingCh
             var state = previousState ?? new PollingState(acquiredTask.Id);
             state.UpdateState(newResponseJson, utcNow);
 
-            // ---------- НОВЫЙ БЛОК: доставка через Outbox ----------
+            // ----------  доставка через Outbox ----------
             OutboxMessage? deliveryMessage = null;
             if (hasChanged && acquiredTask.ResultDelivery is not null)
             {

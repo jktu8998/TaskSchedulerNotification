@@ -95,12 +95,13 @@ public sealed class RabbitMqMessageQueue : IMessageQueue, IAsyncDisposable
         }
     }
     
-     
-    public Task SubscribeAsync(Func<TaskId, CancellationToken, Task> handler, CancellationToken ct = default)
-    {
-        // TODO: реализовать асинхронного потребителя с помощью AsyncEventingBasicConsumer
-        throw new NotImplementedException();
-    }
+    
+     // этот метод теперь тут не нужен  
+     // public Task SubscribeAsync(Func<TaskId, CancellationToken, Task> handler, CancellationToken ct = default)
+     // {
+     //     // 
+     //     throw new NotImplementedException();
+     // }
 
     public async ValueTask DisposeAsync()
     {

@@ -10,7 +10,7 @@ using Infrastructure.SystemUtilities;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Infrastructure;
+namespace Infrastructure.DependencyInjection;
 
 /// <summary>
 /// Регистрация всех инфраструктурных зависимостей в DI-контейнере.

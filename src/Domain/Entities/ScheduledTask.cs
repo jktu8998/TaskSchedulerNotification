@@ -54,7 +54,7 @@ public sealed class ScheduledTask : IHasDomainEvents
     
     public int CurrentAttempt { get; private set; }
     public TaskMetadata Metadata { get; private set; }
-    // ==========  ключ идемпотентности ==========
+    // ========== ключ идемпотентности ==========
     public string IdempotencyKey { get; private set; }
     // ==========  сырой JSON-запрос ==========
     public string RawPayload { get; private set; }
