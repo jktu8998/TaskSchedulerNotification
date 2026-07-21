@@ -5,6 +5,8 @@
 -- 1. Основная таблица заданий
 CREATE TABLE IF NOT EXISTS tasks (
     id                      UUID PRIMARY KEY,
+    chain_id                UUID NULL REFERENCES job_chains(id) ON DELETE SET NULL,
+    chain_step_index        INTEGER NULL,
     sender_id               VARCHAR(128) NOT NULL,
     idempotency_key         VARCHAR(128) NOT NULL,
     type                    INTEGER NOT NULL,          -- TaskType enum
@@ -24,6 +26,21 @@ CREATE TABLE IF NOT EXISTS tasks (
     current_attempt         INTEGER NOT NULL DEFAULT 0,
     version                 INTEGER NOT NULL DEFAULT 1,
     metadata                JSONB NULL
+    );
+
+-- 1. Новая таблица для хранения цепочек
+CREATE TABLE IF NOT EXISTS job_chains (
+    id                  UUID PRIMARY KEY,
+    sender_id           VARCHAR(128) NOT NULL,
+    name                VARCHAR(256) NOT NULL,
+    description         TEXT NULL,
+    status              INTEGER NOT NULL,          -- ChainStatus enum
+    steps               JSONB NOT NULL,            -- массив ChainStep
+    current_step_index  INTEGER NOT NULL DEFAULT -1,
+    current_task_id     UUID NULL REFERENCES tasks(id) ON DELETE SET NULL,
+    created_at          TIMESTAMPTZ NOT NULL,
+    updated_at          TIMESTAMPTZ NULL,
+    version             INTEGER NOT NULL DEFAULT 1
     );
 
 -- 2. Таблица исходящих сообщений (Transactional Outbox)
@@ -84,7 +101,13 @@ CREATE INDEX IF NOT EXISTS ix_tasks_executing_locked ON tasks (status, locked_un
 
 -- Polling-задания
 CREATE INDEX IF NOT EXISTS ix_tasks_polling_scheduled ON tasks (type, status, next_execution_at)
-    WHERE type = 3 AND status = 1; -- Polling + Scheduled
+    WHERE type = 3 AND status = 1; -- Polling + Scheduledc
+
+-- Индексы для производительности цепочек заданий 
+CREATE INDEX IF NOT EXISTS ix_job_chains_sender ON job_chains (sender_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS ix_job_chains_status ON job_chains (status) WHERE status = 1; -- Activeс
+-- Для быстрого поиска заданий, принадлежащих цепочке
+CREATE INDEX IF NOT EXISTS ix_tasks_chain_id ON tasks (chain_id) WHERE chain_id IS NOT NULL;
 
 -- Outbox: выборка необработанных сообщений
 CREATE INDEX IF NOT EXISTS ix_outbox_created ON outbox_messages (created_at, event_type);

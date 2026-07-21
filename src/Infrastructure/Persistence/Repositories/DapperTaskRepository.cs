@@ -27,9 +27,11 @@ public sealed class DapperTaskRepository : ITaskRepository
                 encrypted_sensitive_data, raw_payload,
                 created_at, updated_at,
                 next_execution_at, locked_until, scheduled_at,
-                current_attempt, version, metadata
+                current_attempt, version, metadata,
+                chain_id, chain_step_index               
             ) VALUES (
-                @Id, @SenderId, @IdempotencyKey,
+                @Id,@ChainId, @ChainStepIndex, 
+                @SenderId, @IdempotencyKey,
                 @Type, @Status,
                 @Schedule, @Strategy,
                 @ResultDelivery, @PollingConfig, @RetryPolicy,
@@ -60,7 +62,9 @@ public sealed class DapperTaskRepository : ITaskRepository
             task.ScheduledAt,
             task.CurrentAttempt,
             task.Version,
-            Metadata = task.Metadata           // будет обработан TypeHandler'ом
+            Metadata = task.Metadata ,          // будет обработан TypeHandler'ом
+            ChainId = (object?)task.ChainId ?? DBNull.Value,
+            ChainStepIndex = (object?)task.ChainStepIndex ?? DBNull.Value
         }, transaction: _db.Transaction);
     }
 
@@ -173,7 +177,9 @@ public sealed class DapperTaskRepository : ITaskRepository
                 scheduled_at = @ScheduledAt,
                 current_attempt = @CurrentAttempt,
                 version = version + 1,
-                metadata = @Metadata
+                metadata = @Metadata,
+                chain_id = @ChainId,         
+                chain_step_index = @ChainStepIndex 
             WHERE id = @Id AND version = @ExpectedVersion
             RETURNING version";
 
@@ -186,7 +192,7 @@ public sealed class DapperTaskRepository : ITaskRepository
                 task.Type,
                 task.Status,
                 task.Schedule,
-                Strategy = task.Strategy,           // было task.Execution
+                Strategy = task.Strategy,            
                 ResultDelivery = task.ResultDelivery,
                 PollingConfig = task.PollingConfig,
                 task.RetryPolicy,
@@ -198,7 +204,9 @@ public sealed class DapperTaskRepository : ITaskRepository
                 task.ScheduledAt,
                 task.CurrentAttempt,
                 ExpectedVersion = expectedVersion,
-                Metadata = task.Metadata
+                Metadata = task.Metadata,
+                ChainId = (object?)task.ChainId ?? DBNull.Value,
+                ChainStepIndex = (object?)task.ChainStepIndex ?? DBNull.Value
             },
             transaction: _db.Transaction);
 

@@ -32,6 +32,7 @@ public static class DapperTypeHandlerConfig
         SqlMapper.AddTypeHandler(new SystemTextJsonbTypeHandler<ResultDeliveryConfig>());
         SqlMapper.AddTypeHandler(new SystemTextJsonbTypeHandler<PollingConfig>());
         SqlMapper.AddTypeHandler(new SystemTextJsonbTypeHandler<RetryPolicy>());
+        SqlMapper.AddTypeHandler(new ChainStepListTypeHandler());
         // Метаданные задания (TaskMetadata) — теперь тоже сохраняются в JSONB
         SqlMapper.AddTypeHandler(new SystemTextJsonbTypeHandler<TaskMetadata>());
     }
