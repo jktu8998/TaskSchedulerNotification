@@ -1,5 +1,6 @@
 using Application.Dto;
 using Domain.Entities;
+using Domain.ValueObjects;
 
 namespace Application.Interfaces;
 
@@ -17,7 +18,8 @@ public interface ITaskFactory
     /// <param name="utcNow">Текущее время.</param>
     /// <returns>Новый агрегат с проставленным NextExecutionAt и статусом Scheduled.</returns>
     ScheduledTask CreateFromRequest(CreateTaskRequest request, 
-        string senderId, DateTime utcNow,string idempotencyKey);
+        string senderId, DateTime utcNow,string idempotencyKey,
+        TaskId? chainId = null, int? chainStepIndex = null);
     /// <summary>
     /// Создаёт агрегат из снапшота DLQ, где sensitive-данные уже зашифрованы.
     /// </summary>

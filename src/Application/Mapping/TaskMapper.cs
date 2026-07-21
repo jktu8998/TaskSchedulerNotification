@@ -108,7 +108,7 @@ public static class TaskMapper
     }
 
     // Приватные хелперы маппинга составных частей ответа
-    private static ExecutionConfigDto MapExecutionToDto(ExecutionStrategy strategy) => MapExecutionConfig(strategy);
+    public static ExecutionConfigDto MapExecutionToDto(ExecutionStrategy strategy) => MapExecutionConfig(strategy);
 
     private static ScheduleDto MapSchedule(Schedule schedule) => new()
     {
@@ -165,7 +165,7 @@ public static class TaskMapper
     };
 
     //потом можно добавить недели и месяцы 
-    private static string FormatOffset(TimeSpan offset)
+    public static string FormatOffset(TimeSpan offset)
     {
         if (offset.TotalSeconds == 0) return "0s";
         if (offset.TotalDays >= 1 && offset.TotalDays % 1 == 0) return $"{(int)offset.TotalDays}d";

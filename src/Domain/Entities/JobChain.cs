@@ -31,6 +31,8 @@ public sealed class JobChain : IHasDomainEvents
 
     public DateTime CreatedAt { get; private set; }
     public DateTime? UpdatedAt { get; private set; }
+    /// <summary>Версия агрегата для оптимистичной блокировки.</summary>
+    public int Version { get; private set; }
 
     // Доменные события
     private readonly List<IDomainEvent> _domainEvents = new();
@@ -81,7 +83,7 @@ public sealed class JobChain : IHasDomainEvents
         CurrentTaskId = null;
         CreatedAt = utcNow;
         UpdatedAt = utcNow;
-
+        Version = 1;//Инкрементироваться версия будет внутри SQL-запроса в DapperJobChainRepository.UpdateAsync (как в DapperTaskRepository.UpdateAsync)
         // Событие создания (цепочка пока не активна, ждёт запуска)
         _domainEvents.Add(new ChainStartedEvent(Id));
     }

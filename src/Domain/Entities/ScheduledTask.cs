@@ -47,6 +47,18 @@ public sealed class ScheduledTask : IHasDomainEvents
     ///  инкремент будет в SQL на слое Infrastructure.
     /// </summary>
     public int Version { get; private set; }
+    
+    /// <summary>
+    /// Идентификатор цепочки, если задание является шагом цепочки.
+    /// null для обычных заданий.
+    /// </summary>
+    public TaskId? ChainId { get; private set; }
+
+    /// <summary>
+    /// Индекс шага в цепочке, если задание является частью цепочки.
+    /// null для обычных заданий.
+    /// </summary>
+    public int? ChainStepIndex { get; private set; }
 
     // События домена
     private readonly List<IDomainEvent> _domainEvents = new();
@@ -93,7 +105,9 @@ public sealed class ScheduledTask : IHasDomainEvents
         DateTime utcNow,
         TaskMetadata? metadata ,
         string idempotencyKey,
-        string rawPayload)
+        string rawPayload,
+        TaskId? chainId = null,
+        int? chainStepIndex = null)
     {
         // Конструктор SenderId(string) гарантирует непустоту, так что достаточно проверки на default.
         if (senderId == default)
@@ -132,6 +146,8 @@ public sealed class ScheduledTask : IHasDomainEvents
         Version = 1; // Начальная версия агрегата
         IdempotencyKey = idempotencyKey;
         RawPayload = rawPayload;
+        ChainId = chainId;
+        ChainStepIndex = chainStepIndex;
         // событие теперь содержит только TaskId
         _domainEvents.Add(new TaskCreatedEvent(Id));
         Metadata = metadata ?? TaskMetadata.Empty;

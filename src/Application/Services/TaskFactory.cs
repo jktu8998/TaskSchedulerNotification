@@ -17,7 +17,8 @@ public sealed class TaskFactory : ITaskFactory
     public ScheduledTask CreateFromRequest(
         CreateTaskRequest request,
         string senderId, DateTime utcNow,
-        string idempotencyKey)
+        string idempotencyKey,
+        TaskId? chainId = null, int? chainStepIndex = null)
     {
         string? encrypted = null;
         if (!string.IsNullOrWhiteSpace(request.SensitiveData))
@@ -31,7 +32,8 @@ public sealed class TaskFactory : ITaskFactory
             request.ResultDelivery, request.PollingConfig, request.Retry,
             encrypted, request.ExtensionData, senderId, utcNow,
             idempotencyKey, 
-            rawPayload: rawPayload);   
+            rawPayload: rawPayload,
+            chainId, chainStepIndex);   
     }
 
     public ScheduledTask CreateFromSnapshot(TaskSnapshotDto snapshot, string senderId, DateTime utcNow)
@@ -66,8 +68,8 @@ public sealed class TaskFactory : ITaskFactory
         ResultDeliveryConfigDto? resultDeliveryDto, PollingConfigDto? pollingDto,
         RetryPolicyDto? retryDto, string? encryptedSensitive,
         Dictionary<string, object>? extensionData, string senderId, DateTime utcNow,
-        string idempotencyKey,
-        string? rawPayload)
+        string idempotencyKey, string? rawPayload,
+        TaskId? chainId = null, int? chainStepIndex = null)
     {
         var schedule = ScheduleMapper.MapSchedule(scheduleDto);
         var strategy = TaskMapper.CreateExecutionStrategy(execDto);
@@ -115,7 +117,8 @@ public sealed class TaskFactory : ITaskFactory
             schedule, strategy, resultDelivery, pollingConfig, retryPolicy,
             encryptedSensitive, utcNow, metadata,
             idempotencyKey,        // передаём
-            rawPayload ?? string.Empty); // если нет, передаём пустую строку (позже заменим);
+            rawPayload ?? string.Empty,
+            chainId ,chainStepIndex); // если нет, передаём пустую строку (позже заменим);
 
         var nextExecution = task.Schedule.GetNextOccurrence(task.CreatedAt)
             ?? throw new InvalidOperationException("Cron expression has no future occurrences.");
