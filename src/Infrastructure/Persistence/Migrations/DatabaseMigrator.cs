@@ -29,7 +29,10 @@ public static class DatabaseMigrator
             .WithTransactionPerScript()           // каждый скрипт в своей транзакции
             .Build();
 
-        
+        var scripts = upgrader.GetScriptsToExecute();
+        logger.LogInformation("Found {Count} migration scripts to execute", scripts.Count);
+        foreach (var script in scripts)
+            logger.LogInformation("Script: {Name}", script.Name);
 
         var result = upgrader.PerformUpgrade();
 

@@ -5,7 +5,7 @@
 -- 1. Основная таблица заданий
 CREATE TABLE IF NOT EXISTS tasks (
     id                      UUID PRIMARY KEY,
-    chain_id                UUID NULL REFERENCES job_chains(id) ON DELETE SET NULL,
+    chain_id                UUID NULL ,--REFERENCES job_chains(id) ON DELETE SET NULL,
     chain_step_index        INTEGER NULL,
     sender_id               VARCHAR(128) NOT NULL,
     idempotency_key         VARCHAR(128) NOT NULL,
@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS job_chains (
     status              INTEGER NOT NULL,          -- ChainStatus enum
     steps               JSONB NOT NULL,            -- массив ChainStep
     current_step_index  INTEGER NOT NULL DEFAULT -1,
-    current_task_id     UUID NULL REFERENCES tasks(id) ON DELETE SET NULL,
+    current_task_id     UUID NULL ,--REFERENCES tasks(id) ON DELETE SET NULL,
     created_at          TIMESTAMPTZ NOT NULL,
     updated_at          TIMESTAMPTZ NULL,
     version             INTEGER NOT NULL DEFAULT 1
@@ -80,6 +80,15 @@ CREATE TABLE IF NOT EXISTS task_logs (
     message     TEXT NULL,
     details     TEXT NULL
     );
+
+-- Добавляем внешние ключи после создания обеих таблиц
+ALTER TABLE tasks
+    ADD CONSTRAINT fk_tasks_chain
+        FOREIGN KEY (chain_id) REFERENCES job_chains(id) ON DELETE SET NULL;
+
+ALTER TABLE job_chains
+    ADD CONSTRAINT fk_job_chains_current_task
+        FOREIGN KEY (current_task_id) REFERENCES tasks(id) ON DELETE SET NULL;
 
 -- ============================================================
 -- Индексы для производительности и ограничения

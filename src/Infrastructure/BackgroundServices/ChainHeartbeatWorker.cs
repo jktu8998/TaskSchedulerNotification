@@ -26,7 +26,7 @@ public sealed class ChainHeartbeatWorker : BackgroundService
         {
             try
             {
-                using var scope = _scopeFactory.CreateScope();
+                await using var scope = _scopeFactory.CreateAsyncScope();
                 var handler = scope.ServiceProvider.GetRequiredService<ICommandHandler<RunChainHeartbeatCommand>>();
                 await handler.HandleAsync(new RunChainHeartbeatCommand(), stoppingToken);
             }

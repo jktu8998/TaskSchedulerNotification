@@ -27,7 +27,7 @@ public sealed class OutboxProcessorWorker : BackgroundService
         {
             try
             {
-                using var scope = _scopeFactory.CreateScope();
+                await using var scope = _scopeFactory.CreateAsyncScope();
                 var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
                 var outboxRepo = scope.ServiceProvider.GetRequiredService<IOutboxRepository>();
                 var messageQueue = scope.ServiceProvider.GetRequiredService<IMessageQueue>();

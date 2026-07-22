@@ -26,7 +26,7 @@ public sealed class PollingWorker : BackgroundService
         {
             try
             {
-                using var scope = _scopeFactory.CreateScope();
+                await using var scope = _scopeFactory.CreateAsyncScope();
                 var handler = scope.ServiceProvider.GetRequiredService<ICommandHandler<RunPollingCheckCommand>>();
 
                 await handler.HandleAsync(new RunPollingCheckCommand(), stoppingToken);

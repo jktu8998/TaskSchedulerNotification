@@ -27,8 +27,8 @@ public sealed class SchedulerWorker : BackgroundService
         {
             try
             {
-                using var scope = _scopeFactory.CreateScope();
-                var handler = scope.ServiceProvider.GetRequiredService<ICommandHandler<RunSchedulingCommand>>();
+               await using var scope = _scopeFactory.CreateAsyncScope();
+               var handler = scope.ServiceProvider.GetRequiredService<ICommandHandler<RunSchedulingCommand>>();
 
                 await handler.HandleAsync(new RunSchedulingCommand(), stoppingToken);
 

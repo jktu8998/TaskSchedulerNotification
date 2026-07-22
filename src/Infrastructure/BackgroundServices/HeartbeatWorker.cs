@@ -32,7 +32,7 @@ public sealed class HeartbeatWorker : BackgroundService
         {
             try
             {
-                using var scope = _scopeFactory.CreateScope();
+                await using var scope = _scopeFactory.CreateAsyncScope();
                 var handler = scope.ServiceProvider.GetRequiredService<ICommandHandler<RunHeartbeatCommand>>();
 
                 await handler.HandleAsync(new RunHeartbeatCommand(), stoppingToken);
