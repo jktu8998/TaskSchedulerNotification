@@ -144,6 +144,7 @@ app.UseAuthorization();
 
 // Middleware контекста запроса (должен идти после аутентификации)
 app.UseMiddleware<RequestContextMiddleware>();
+app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 app.MapControllers();
 

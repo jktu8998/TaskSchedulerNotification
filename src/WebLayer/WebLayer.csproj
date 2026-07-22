@@ -24,7 +24,6 @@
 
   <ItemGroup>
     <Folder Include="Configuration\" />
-    <Folder Include="Controllers\" />
     <Folder Include="Filters\" />
     <Folder Include="Models\" />
   </ItemGroup>
