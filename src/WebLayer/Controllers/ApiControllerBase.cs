@@ -8,7 +8,7 @@ namespace WebLayer.Controllers;
 /// Устанавливает общий префикс маршрута "api/v1/[controller]" и включает авторизацию.
 /// </summary>
 [ApiController]
-[Route("api/v1/[controller]")]
+[Route("api/v{version:apiVersion}/[controller]")]
 [Authorize]
 public abstract class ApiControllerBase : ControllerBase
 {

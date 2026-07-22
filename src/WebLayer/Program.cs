@@ -1,5 +1,8 @@
+using System.Reflection;
 using System.Text;
 using Application.DependencyInjection;
+using Asp.Versioning;
+using Asp.Versioning.ApiExplorer;
 using Infrastructure.DependencyInjection;
 using Infrastructure.Persistence.Migrations;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -7,7 +10,7 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Serilog;
-
+using WebLayer.Configuration;
 using WebLayer.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -27,6 +30,23 @@ var configuration = builder.Configuration;
 // ========== 3. Регистрация слоёв ==========
 builder.Services.AddApplication();       // Application-слой (команды, запросы, валидаторы и т.д.)
 builder.Services.AddInfrastructure(configuration); // Infrastructure-слой (БД, RabbitMQ, воркеры)
+
+// ========== Versioning  ==========
+builder.Services.AddApiVersioning(options =>
+{
+    options.DefaultApiVersion = new ApiVersion(1, 0);
+    options.AssumeDefaultVersionWhenUnspecified = true;   // если версия не указана, используется 1.0
+    options.ReportApiVersions = true;                     // в ответе будет заголовок api-supported-versions
+    options.ApiVersionReader = new UrlSegmentApiVersionReader(); // версия из URL: /api/v{version:apiVersion}/...
+}).AddApiExplorer(options =>
+{
+    options.GroupNameFormat = "'v'VVV";      // формат группы в Swagger: v1, v2
+    options.SubstituteApiVersionInUrl = true; // подставляет версию в путь
+});
+// Swagger с поддержкой версий
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+builder.Services.ConfigureOptions<ConfigureSwaggerOptions>(); // отдельный класс для настройки Swagger под версии
 
 // ========== 4. Аутентификация JWT ==========
 var jwtSettings = configuration.GetSection("Jwt");
@@ -58,6 +78,12 @@ builder.Services.AddScoped<Application.Interfaces.IRequestContext, RequestContex
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
+    var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, xmlFile));
+//  DTO описаны в Application:
+    var appXmlFile = $"{typeof(Application.DependencyInjection.DependencyInjection).Assembly.GetName().Name}.xml";
+    options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, appXmlFile));
+    
     options.SwaggerDoc("v1", new OpenApiInfo
     {
         Title = "Task Scheduler API",
@@ -141,7 +167,16 @@ app.UseCors();
 
 app.UseAuthentication();
 app.UseAuthorization();
-
+app.UseSwagger();
+app.UseSwaggerUI(options =>
+{
+    var provider = app.Services.GetRequiredService<IApiVersionDescriptionProvider>();
+    foreach (var description in provider.ApiVersionDescriptions)
+    {
+        options.SwaggerEndpoint($"/swagger/{description.GroupName}/swagger.json",
+            description.GroupName.ToUpperInvariant());
+    }
+});
 // Middleware контекста запроса (должен идти после аутентификации)
 app.UseMiddleware<RequestContextMiddleware>();
 app.UseMiddleware<ExceptionHandlingMiddleware>();
