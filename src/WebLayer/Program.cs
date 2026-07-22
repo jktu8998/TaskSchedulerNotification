@@ -78,11 +78,6 @@ builder.Services.AddScoped<Application.Interfaces.IRequestContext, RequestContex
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
-    var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
-    options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, xmlFile));
-//  DTO описаны в Application:
-    var appXmlFile = $"{typeof(Application.DependencyInjection.DependencyInjection).Assembly.GetName().Name}.xml";
-    options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, appXmlFile));
     
     options.SwaggerDoc("v1", new OpenApiInfo
     {
@@ -92,9 +87,12 @@ builder.Services.AddSwaggerGen(options =>
     });
 
     // Включение XML-комментариев (если генерируются)
-    // var xmlFilename = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
-    // options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, xmlFilename));
-
+    var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+        options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, xmlFile));
+    //  DTO описаны в Application:
+    var appXmlFile = $"{typeof(Application.DependencyInjection.DependencyInjection).Assembly.GetName().Name}.xml";
+        options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, appXmlFile));
+        
     // Поддержка JWT в Swagger UI
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
@@ -123,7 +121,7 @@ builder.Services.AddHealthChecks()
 // ========== 8. Контроллеры ==========
 builder.Services.AddControllers(); // Мы будем добавлять контроллеры позже
 
-// ========== 9. CORS (опционально) ==========
+// ========== 9. CORS  ==========
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>

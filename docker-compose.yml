@@ -1,19 +1,19 @@
-version: '3.8'
+
 
 services:
   postgres:
     image: postgres:16
     container_name: task-scheduler-postgres
     environment:
-      POSTGRES_DB: taskdb
-      POSTGRES_USER: taskuser
-      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: task_scheduler
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U taskuser -d taskdb"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d task_scheduler"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -28,7 +28,7 @@ services:
       - "5672:5672"   # AMQP
       - "15672:15672" # Management UI
     healthcheck:
-      test: ["CMD", "rabbitmqctl", "status"]
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
       interval: 5s
       timeout: 5s
       retries: 5

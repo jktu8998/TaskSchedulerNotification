@@ -1,6 +1,7 @@
 using Application.Interfaces;
 using Domain.Interfaces;
 using Infrastructure.BackgroundServices;
+using Infrastructure.DomainEvents;
 using Infrastructure.Messaging;
 using Infrastructure.Network;
 using Infrastructure.Persistence;
@@ -43,7 +44,7 @@ public static class DependencyInjection
         services.AddScoped<ITaskLogRepository, DapperTaskLogRepository>();
         services.AddScoped<IDeadLetterRepository, DapperDeadLetterRepository>();
         services.AddScoped<IPollingStateRepository, DapperPollingStateRepository>();
-
+        services.AddScoped<IJobChainRepository, DapperJobChainRepository>();
         // --------------------------------------------------
         // 3. System Utilities (Singleton)
         // --------------------------------------------------
@@ -71,6 +72,9 @@ public static class DependencyInjection
         services.AddHostedService<TaskExecutionWorker>();
         services.AddHostedService<PollingWorker>();   
 
+        //
+        services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
+        
         return services;
     }
 }
