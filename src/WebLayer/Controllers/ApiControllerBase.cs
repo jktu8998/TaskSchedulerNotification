@@ -9,7 +9,7 @@ namespace WebLayer.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/v{version:apiVersion}/[controller]")]
-[Authorize]
+//[Authorize]
 public abstract class ApiControllerBase : ControllerBase
 {
 }

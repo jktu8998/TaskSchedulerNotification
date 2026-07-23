@@ -1,3 +1,4 @@
+using System.Reflection;
 using Asp.Versioning.ApiExplorer;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
@@ -27,6 +28,12 @@ public class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOptions>
                     : "API для отложенного выполнения заданий."
             });
         }
+        // Включение XML-комментариев (если генерируются)
+        var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+        options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, xmlFile));
+        //  DTO описаны в Application:
+        var appXmlFile = $"{typeof(Application.DependencyInjection.DependencyInjection).Assembly.GetName().Name}.xml";
+        options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, appXmlFile));
 
         // JWT авторизация (без изменений)
         options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme

@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Authorization;
+
 namespace WebLayer.Middleware;
 
 using System.Security.Claims;
@@ -19,34 +21,21 @@ public sealed class RequestContextMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
+        // Заполняем контекст только если пользователь аутентифицирован
         if (context.User.Identity?.IsAuthenticated == true)
         {
-            // Извлекаем SenderId из claim'а "sender_id" (или "sub" как fallback)
             var senderId = context.User.FindFirstValue("sender_id")
                            ?? context.User.FindFirstValue(ClaimTypes.NameIdentifier);
 
             if (!string.IsNullOrWhiteSpace(senderId))
             {
                 context.Items["SenderId"] = senderId;
-
-                // Проверяем, является ли отправитель администратором (claim "admin" или роль "Admin")
-                var isAdmin = context.User.HasClaim(c => c.Type == "admin" && c.Value == "true")
-                              || context.User.IsInRole("Admin");
-                context.Items["IsAdmin"] = isAdmin;
+                context.Items["IsAdmin"] = context.User.HasClaim(c => c.Type == "admin" && c.Value == "true")
+                                           || context.User.IsInRole("Admin");
             }
-            else
-            {
-                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                await context.Response.WriteAsync("{\"error\":\"SenderId claim is missing\"}");
-                return;
-            }
+            // Если sender_id отсутствует, просто не заполняем – MVC-авторизация дальше решит, можно ли доступ
         }
-        else
-        {
-            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-            await context.Response.WriteAsync("{\"error\":\"Authentication required\"}");
-            return;
-        }
+        // Если не аутентифицирован – ничего не заполняем, но не блокируем
 
         await _next(context);
     }

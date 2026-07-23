@@ -76,15 +76,15 @@ builder.Services.AddScoped<Application.Interfaces.IRequestContext, RequestContex
 
 // ========== 6. Swagger / OpenAPI ==========
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(options =>
+/*builder.Services.AddSwaggerGen(options =>
 {
     
-    options.SwaggerDoc("v1", new OpenApiInfo
-    {
-        Title = "Task Scheduler API",
-        Version = "v1",
-        Description = "API для отложенного выполнения заданий"
-    });
+    // options.SwaggerDoc("v1", new OpenApiInfo
+    // {
+    //     Title = "Task Scheduler API",
+    //     Version = "v1",
+    //     Description = "API для отложенного выполнения заданий"
+    // });
 
     // Включение XML-комментариев (если генерируются)
     var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
@@ -112,7 +112,7 @@ builder.Services.AddSwaggerGen(options =>
             Array.Empty<string>()
         }
     });
-});
+});*/
 
 // ========== 7. Health Checks ==========
 builder.Services.AddHealthChecks()
@@ -176,7 +176,7 @@ app.UseSwaggerUI(options =>
     }
 });
 // Middleware контекста запроса (должен идти после аутентификации)
-app.UseMiddleware<RequestContextMiddleware>();
+app.UseMiddleware<RequestContextMiddleware>(); 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 app.MapControllers();
@@ -199,6 +199,6 @@ app.MapHealthChecks("/health", new HealthCheckOptions
         });
         await context.Response.WriteAsync(json);
     }
-});
+}).AllowAnonymous();
 
 app.Run();
