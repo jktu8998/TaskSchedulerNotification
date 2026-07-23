@@ -1,4 +1,5 @@
-using System.Reflection;
+using Scrutor;
+using Application.Decorator;
 using Application.Commands;
 using Application.DomainEventHandlers;
 using Application.Dto;
@@ -71,6 +72,9 @@ public static class DependencyInjection
         services.AddScoped<IDomainEventHandler<TaskCompletedEvent>, ChainStepCompletionHandler>();
         services.AddScoped<IDomainEventHandler<TaskMovedToDlqEvent>, ChainStepFailureHandler>();
 
+        services.Decorate(typeof(ICommandHandler<>), typeof(TransactionCommandHandlerDecorator<>));
+        services.Decorate(typeof(ICommandHandler<,>), typeof(TransactionCommandHandlerDecorator<,>));
+        
         return services;
     }
 }

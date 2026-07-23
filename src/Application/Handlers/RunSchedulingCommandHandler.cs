@@ -34,57 +34,52 @@ public sealed class RunSchedulingCommandHandler : ICommandHandler<RunSchedulingC
         _unitOfWork = unitOfWork;
         _dispatcher = dispatcher;
     }
-
+    
     public async Task HandleAsync(RunSchedulingCommand command, CancellationToken cancellationToken = default)
     {
         var utcNow = _dateTime.UtcNow;
-        
+
+        // 1. Начинаем транзакцию перед любым обращением к БД
+        await _unitOfWork.BeginTransactionAsync(cancellationToken);
+        try
+        {
             var readyTasks = await _taskRepo.GetScheduledBeforeAsync(utcNow, BatchSize, cancellationToken);
 
-            if (readyTasks.Count == 0) return;
-                // return;
+            if (readyTasks.Count == 0)
+            {
+                await _unitOfWork.CommitAsync(cancellationToken); // фиксируем пустую транзакцию
+                return;
+            }
 
             var tasksToUpdate = new List<ScheduledTask>(readyTasks.Count);
             var outboxMessages = new List<OutboxMessage>(readyTasks.Count);
 
-            // Подготавливаем все изменения в памяти
             foreach (var task in readyTasks)
             {
                 task.Enqueue(utcNow);
-
-                // Создаём outbox-сообщение для события TaskQueuedEvent
                 var queuedEvent = new TaskQueuedEvent(task.Id);
                 var outboxMessage = new OutboxMessage(
                     task.Id,
-                    nameof(TaskQueuedEvent), // "TaskQueuedEvent"
+                    nameof(TaskQueuedEvent),
                     JsonSerializer.Serialize(queuedEvent),
                     utcNow);
-
                 tasksToUpdate.Add(task);
                 outboxMessages.Add(outboxMessage);
-
-                // Регистрируем агрегат для автоматической очистки событий при коммите
                 _unitOfWork.Track(task);
             }
 
-            // Атомарно сохраняем всё в одной транзакции
-            await _unitOfWork.BeginTransactionAsync(cancellationToken);
-            try
-            {
-                await _taskRepo.BulkUpdateAsync(tasksToUpdate, cancellationToken);
-                await _outboxRepo.BulkAddAsync(outboxMessages, cancellationToken);
+            await _taskRepo.BulkUpdateAsync(tasksToUpdate, cancellationToken);
+            await _outboxRepo.BulkAddAsync(outboxMessages, cancellationToken);
 
-                // Диспетчеризуем все накопленные события
-                var allEvents = tasksToUpdate.SelectMany(t => t.DomainEvents).ToList();
-                await _dispatcher.DispatchAsync(allEvents, cancellationToken);
+            var allEvents = tasksToUpdate.SelectMany(t => t.DomainEvents).ToList();
+            await _dispatcher.DispatchAsync(allEvents, cancellationToken);
 
-                await _unitOfWork.CommitAsync(cancellationToken);
-                // CommitAsync вызовет ClearDomainEvents у всех Tracked агрегатов
-            }
-            catch
-            {
-                await _unitOfWork.RollbackAsync(cancellationToken);
-                throw;
-            }
+            await _unitOfWork.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            throw;
+        }
     }
 }

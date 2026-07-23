@@ -38,21 +38,28 @@ public sealed class RunHeartbeatCommandHandler : ICommandHandler<RunHeartbeatCom
         _random = random;
     }
 
-    public async Task HandleAsync(RunHeartbeatCommand command, CancellationToken cancellationToken = default)
+   
+public async Task HandleAsync(RunHeartbeatCommand command, CancellationToken cancellationToken = default)
+{
+    var utcNow = _dateTime.UtcNow;
+
+    await _unitOfWork.BeginTransactionAsync(cancellationToken);
+    try
     {
-        var utcNow = _dateTime.UtcNow;
         var staleTasks = await _taskRepo.GetStaleExecutingTasksAsync(utcNow, cancellationToken);
 
-        if (staleTasks.Count == 0) return;
+        if (staleTasks.Count == 0)
+        {
+            await _unitOfWork.CommitAsync(cancellationToken);
+            return;
+        }
 
         var tasksToUpdate = new List<ScheduledTask>(staleTasks.Count);
         var dlqEntries = new List<DeadLetterEntry>();
 
         foreach (var task in staleTasks)
         {
-            // 1. Помечаем задание как проваленное (домен сам инкрементит попытки и решит: Failed или Dead)
             task.MarkFailed(utcNow, "Execution timed out (recovered by Heartbeat)");
-
             if (task.Status == StatusTask.Failed)
             {
                 var delay = task.RetryPolicy.GetRetryDelay(task.CurrentAttempt);
@@ -61,12 +68,8 @@ public sealed class RunHeartbeatCommandHandler : ICommandHandler<RunHeartbeatCom
             }
             else if (task.Status == StatusTask.Dead)
             {
-                // Создаём запись DLQ
-                
-                // Создаём DTO-снапшот и сериализуем его
                 var snapshotDto = TaskMapper.ToSnapshot(task);
                 var snapshot = JsonSerializer.Serialize(snapshotDto);
-
                 var dlqEntry = new DeadLetterEntry(
                     task.Id,
                     task.SenderId,
@@ -75,30 +78,23 @@ public sealed class RunHeartbeatCommandHandler : ICommandHandler<RunHeartbeatCom
                     utcNow);
                 dlqEntries.Add(dlqEntry);
             }
-
             tasksToUpdate.Add(task);
-            _unitOfWork.Track(task); // очистка событий после коммита
+            _unitOfWork.Track(task);
         }
 
-        // Сохраняем всё в одной транзакции
-        await _unitOfWork.BeginTransactionAsync(cancellationToken);
-        try
-        {
-            await _taskRepo.BulkUpdateAsync(tasksToUpdate, cancellationToken);
+        await _taskRepo.BulkUpdateAsync(tasksToUpdate, cancellationToken);
+        if (dlqEntries.Count > 0)
+            await _dlqRepo.BulkAddAsync(dlqEntries, cancellationToken);
 
-            if (dlqEntries.Count > 0)
-                await _dlqRepo.BulkAddAsync(dlqEntries, cancellationToken);
+        var allEvents = tasksToUpdate.SelectMany(t => t.DomainEvents).ToList();
+        await _dispatcher.DispatchAsync(allEvents, cancellationToken);
 
-            // Диспетчеризуем все накопленные события
-            var allEvents = tasksToUpdate.SelectMany(t => t.DomainEvents).ToList();
-            await _dispatcher.DispatchAsync(allEvents, cancellationToken);
-
-            await _unitOfWork.CommitAsync(cancellationToken);
-        }
-        catch
-        {
-            await _unitOfWork.RollbackAsync(cancellationToken);
-            throw;
-        }
+        await _unitOfWork.CommitAsync(cancellationToken);
     }
+    catch
+    {
+        await _unitOfWork.RollbackAsync(cancellationToken);
+        throw;
+    }
+}
 }

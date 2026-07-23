@@ -76,43 +76,7 @@ builder.Services.AddScoped<Application.Interfaces.IRequestContext, RequestContex
 
 // ========== 6. Swagger / OpenAPI ==========
 builder.Services.AddEndpointsApiExplorer();
-/*builder.Services.AddSwaggerGen(options =>
-{
-    
-    // options.SwaggerDoc("v1", new OpenApiInfo
-    // {
-    //     Title = "Task Scheduler API",
-    //     Version = "v1",
-    //     Description = "API для отложенного выполнения заданий"
-    // });
 
-    // Включение XML-комментариев (если генерируются)
-    var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
-        options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, xmlFile));
-    //  DTO описаны в Application:
-    var appXmlFile = $"{typeof(Application.DependencyInjection.DependencyInjection).Assembly.GetName().Name}.xml";
-        options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, appXmlFile));
-        
-    // Поддержка JWT в Swagger UI
-    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
-    {
-        Description = "JWT Authorization header using the Bearer scheme. Enter 'Bearer' [space] and then your token.",
-        Name = "Authorization",
-        In = ParameterLocation.Header,
-        Type = SecuritySchemeType.ApiKey,
-        Scheme = "Bearer"
-    });
-    options.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
-        {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
-            },
-            Array.Empty<string>()
-        }
-    });
-});*/
 
 // ========== 7. Health Checks ==========
 builder.Services.AddHealthChecks()
@@ -151,11 +115,11 @@ using (var scope = app.Services.CreateScope())
 }
 
 // ========== 11. Pipeline ==========
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+// if (app.Environment.IsDevelopment())
+// {
+//     app.UseSwagger();
+//     app.UseSwaggerUI();
+// }
 
 app.UseSerilogRequestLogging();
 

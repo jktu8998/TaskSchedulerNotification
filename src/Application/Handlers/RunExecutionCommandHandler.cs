@@ -58,7 +58,19 @@ public sealed class RunExecutionCommandHandler : ICommandHandler<RunExecutionCom
         // Мы берём значение по умолчанию (30 сек), сам метод TryAcquireQueuedTaskAsync
         // внутри вычислит LockedUntil = utcNow + (timeoutSeconds ?? 30) + 5.
         // -----------------------------------------------------------------
-        var task = await _taskRepo.TryAcquireQueuedTaskAsync(taskId, utcNow, timeoutSeconds: null, cancellationToken);
+        ScheduledTask? task;
+        await _unitOfWork.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            task = await _taskRepo.TryAcquireQueuedTaskAsync(taskId, utcNow, timeoutSeconds: null, cancellationToken);
+            await _unitOfWork.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            throw;
+        }
+
         if (task is null) return; // задача уже захвачена, отменена или не существует
 
         // После захвата в задаче уже актуальный Status=Executing и LockedUntil

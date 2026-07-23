@@ -38,16 +38,41 @@ public sealed class RunPollingCheckCommandHandler : ICommandHandler<RunPollingCh
         _outboxRepo = outboxRepo;
     }
     //TODO:проблема N+1 нужно будет решить её тут 
+    //отдельно потом этот метод доделай 
     public async Task HandleAsync(RunPollingCheckCommand command, CancellationToken cancellationToken = default)
     {
         var utcNow = _dateTime.UtcNow;
-        var tasks = await _taskRepo.GetScheduledPollingTasksAsync(utcNow, BatchSize, cancellationToken);
-
+        // Шаг 1: Выборка заданий в отдельной транзакции (нужна для SKIP LOCKED)
+        List<ScheduledTask> tasks;
+        await _unitOfWork.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            tasks = (await _taskRepo.GetScheduledPollingTasksAsync(utcNow, BatchSize, cancellationToken)).ToList();
+            await _unitOfWork.CommitAsync(cancellationToken); // фиксируем и освобождаем блокировки
+        }
+        catch
+        {
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            throw;
+        }
+        // Шаг 2: Обработка каждого задания в собственной транзакции
         foreach (var task in tasks)
         {
             // Атомарно захватываем задачу
-            var acquiredTask = await _taskRepo.TryAcquirePollingTaskAsync(
-                task.Id, utcNow, TimeSpan.FromSeconds(30), cancellationToken);
+            // 2.1. Атомарный захват задачи в короткой транзакции
+            ScheduledTask? acquiredTask;
+            await _unitOfWork.BeginTransactionAsync(cancellationToken);
+            try
+            {
+                acquiredTask = await _taskRepo.TryAcquirePollingTaskAsync(
+                    task.Id, utcNow, TimeSpan.FromSeconds(30), cancellationToken);
+                await _unitOfWork.CommitAsync(cancellationToken);
+            }
+            catch
+            {
+                await _unitOfWork.RollbackAsync(cancellationToken);
+                throw;
+            }
 
             if (acquiredTask is null) continue;
 
@@ -65,11 +90,23 @@ public sealed class RunPollingCheckCommandHandler : ICommandHandler<RunPollingCh
             catch (Exception ex)
             {
                 // Ошибка выполнения запроса — перепланируем без изменений
-                var interval = TimeSpan.FromSeconds(acquiredTask.PollingConfig!.IntervalSeconds);
-                acquiredTask.RescheduleAfterPolling(utcNow, interval);
-                _unitOfWork.Track(acquiredTask);
-                await _taskRepo.UpdateAsync(acquiredTask, acquiredTask.Version, cancellationToken);
-                await _dispatcher.DispatchAsync(acquiredTask.DomainEvents, cancellationToken);
+                // Обработка ошибки, перепланирование без изменения состояния
+                // Для этого нужна транзакция, так как обновляем задание
+                await _unitOfWork.BeginTransactionAsync(cancellationToken);
+                try
+                {
+                    var interval = TimeSpan.FromSeconds(acquiredTask.PollingConfig!.IntervalSeconds);
+                    acquiredTask.RescheduleAfterPolling(utcNow, interval);
+                    _unitOfWork.Track(acquiredTask);
+                    await _taskRepo.UpdateAsync(acquiredTask, acquiredTask.Version, cancellationToken);
+                    await _dispatcher.DispatchAsync(acquiredTask.DomainEvents, cancellationToken);
+                    await _unitOfWork.CommitAsync(cancellationToken);
+                }
+                catch
+                {
+                    await _unitOfWork.RollbackAsync(cancellationToken);
+                    throw;
+                }
                 continue;
             }
 

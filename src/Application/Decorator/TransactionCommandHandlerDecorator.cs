@@ -20,6 +20,13 @@ public sealed class TransactionCommandHandlerDecorator<TCommand> : ICommandHandl
 
     public async Task HandleAsync(TCommand command, CancellationToken cancellationToken = default)
     {
+        // Если команда управляет транзакциями сама — просто делегируем вызов
+        if (command is IManagesOwnTransaction)
+        {
+            await _inner.HandleAsync(command, cancellationToken);
+            return;
+        }
+        // Стандартное поведение для ITransactionalCommand
         if (command is ITransactionalCommand)
         {
             await _unitOfWork.BeginTransactionAsync(cancellationToken);
@@ -58,6 +65,10 @@ public sealed class TransactionCommandHandlerDecorator<TCommand, TResult> : ICom
 
     public async Task<TResult> HandleAsync(TCommand command, CancellationToken cancellationToken = default)
     {
+        if (command is IManagesOwnTransaction)
+        {
+            return await _inner.HandleAsync(command, cancellationToken);
+        }
         if (command is ITransactionalCommand)
         {
             await _unitOfWork.BeginTransactionAsync(cancellationToken);
