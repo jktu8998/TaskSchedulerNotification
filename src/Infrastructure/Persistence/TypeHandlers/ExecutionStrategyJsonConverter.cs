@@ -15,7 +15,19 @@ public sealed class ExecutionStrategyJsonConverter : JsonConverter<ExecutionStra
         using var doc = JsonDocument.ParseValue(ref reader);
         var root = doc.RootElement;
 
-        if (!root.TryGetProperty("strategyType", out var typeProp))
+        // Ищем свойство с именем "strategyType" без учёта регистра
+        JsonElement typeProp = default;
+        bool found = false;
+        foreach (var property in root.EnumerateObject())
+        {
+            if (string.Equals(property.Name, "strategyType", StringComparison.OrdinalIgnoreCase))
+            {
+                typeProp = property.Value;
+                found = true;
+                break;
+            }
+        }
+        if (!found)
             throw new JsonException("Missing required property 'strategyType'");
 
         var strategyType = typeProp.GetString();
