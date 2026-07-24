@@ -20,7 +20,7 @@ public sealed class DapperOutboxRepository : IOutboxRepository
                 id, task_id, event_type, payload,
                 created_at, retry_count, max_retries
             ) VALUES (
-                @Id, @TaskId, @EventType, @Payload,
+                @Id, @TaskId, @EventType, @Payload::jsonb,
                 @CreatedAt, @RetryCount, @MaxRetries
             )";
 
