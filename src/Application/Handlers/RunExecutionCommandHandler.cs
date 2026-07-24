@@ -18,6 +18,7 @@ namespace Application.Handlers;
 public sealed class RunExecutionCommandHandler : ICommandHandler<RunExecutionCommand>
 {
     private readonly ITaskRepository _taskRepo;
+    private readonly ITaskLogRepository _taskLogRepo;
     private readonly IHttpExecutor _httpExecutor;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDateTimeProvider _dateTime;
@@ -35,7 +36,8 @@ public sealed class RunExecutionCommandHandler : ICommandHandler<RunExecutionCom
         IDeadLetterRepository dlqRepo,
         IRandomProvider random,
         IOutboxRepository outboxRep,
-        ILogger<RunExecutionCommandHandler> logger)
+        ILogger<RunExecutionCommandHandler> logger,
+        ITaskLogRepository taskLogRepo)
     {
         _taskRepo = taskRepo;
         _httpExecutor = httpExecutor;
@@ -46,6 +48,7 @@ public sealed class RunExecutionCommandHandler : ICommandHandler<RunExecutionCom
         _random = random;
         _outboxRepo = outboxRep;
         _logger = logger;
+        _taskLogRepo = taskLogRepo;
     }
 
     public async Task HandleAsync(RunExecutionCommand command, CancellationToken cancellationToken = default)
@@ -187,7 +190,14 @@ public sealed class RunExecutionCommandHandler : ICommandHandler<RunExecutionCom
 
                 await _outboxRepo.AddAsync(outboxMessage, cancellationToken);
             }
-
+            var responseLog = new TaskLog(
+                task.Id,
+                "HttpResponse",
+                utcNow,
+                $"HTTP {response.StatusCode}",
+                response.Body
+            );
+            await _taskLogRepo.AddAsync(responseLog, cancellationToken);
             _unitOfWork.Track(task);// возможно оно не на своем месте и должно быть после коммита 
             await _taskRepo.UpdateAsync(task,task.Version, cancellationToken);
             await _dispatcher.DispatchAsync(task.DomainEvents, cancellationToken);
