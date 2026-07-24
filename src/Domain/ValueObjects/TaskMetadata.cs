@@ -12,6 +12,7 @@ public sealed record TaskMetadata
 
     public ImmutableDictionary<string, string> Data { get; init; }
 
+    public TaskMetadata(){} // для Dapper 
     public TaskMetadata(IReadOnlyDictionary<string, string> data)
     {
         if (data is null)

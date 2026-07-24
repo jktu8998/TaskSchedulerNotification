@@ -15,7 +15,12 @@ public sealed class SystemTextJsonbTypeHandler<T> : SqlMapper.TypeHandler<T>
     {
         PropertyNameCaseInsensitive = true,
         DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
-        Converters = { new ExecutionStrategyJsonConverter() }
+        Converters =
+        {
+            new ExecutionStrategyJsonConverter(),
+            new RetryPolicyJsonConverter(),
+            new TaskMetadataJsonConverter() 
+        }
     };
 
     public override void SetValue(IDbDataParameter parameter, T? value)
