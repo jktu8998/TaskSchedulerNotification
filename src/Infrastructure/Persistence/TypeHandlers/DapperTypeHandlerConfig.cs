@@ -1,5 +1,7 @@
 
+using System.Reflection;
 using Dapper;
+using Domain.Entities;
 using Domain.Enums;
 using Domain.ValueObjects;
 
@@ -18,6 +20,19 @@ public static class DapperTypeHandlerConfig
         if (_registered) return;
         _registered = true;
         Dapper.DefaultTypeMap.MatchNamesWithUnderscores = true;
+        
+        // Кастомный маппинг для ScheduledTask: столбец "execution" -> свойство "Strategy"
+        // var taskMap = new CustomPropertyTypeMap(
+        //     typeof(ScheduledTask),
+        //     (type, columnName) =>
+        //     {
+        //         if (columnName.Equals("execution", StringComparison.OrdinalIgnoreCase))
+        //             return type.GetProperty("Strategy");
+        //         // Для остальных столбцов оставляем стандартное поведение
+        //         return type.GetProperty(columnName, BindingFlags.IgnoreCase | BindingFlags.Public | BindingFlags.Instance);
+        //     });
+        // SqlMapper.SetTypeMap(typeof(ScheduledTask), taskMap);
+        
         // TaskId ↔ Guid
         SqlMapper.AddTypeHandler(new TaskIdTypeHandler());
         SqlMapper.AddTypeHandler(new SenderIdTypeHandler());

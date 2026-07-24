@@ -6,6 +6,7 @@ using Domain.Entities;
 using Domain.Enums;
 using Domain.Interfaces;
 using Domain.ValueObjects;
+using Microsoft.Extensions.Logging;
 
 namespace Application.Handlers;
 
@@ -24,7 +25,7 @@ public sealed class RunExecutionCommandHandler : ICommandHandler<RunExecutionCom
     private readonly IDeadLetterRepository _dlqRepo;
     private readonly IRandomProvider _random;
     private readonly IOutboxRepository _outboxRepo;
-
+    private readonly ILogger<RunExecutionCommandHandler> _logger;
     public RunExecutionCommandHandler(
         ITaskRepository taskRepo,
         IHttpExecutor httpExecutor,
@@ -33,7 +34,8 @@ public sealed class RunExecutionCommandHandler : ICommandHandler<RunExecutionCom
         IDomainEventDispatcher dispatcher,
         IDeadLetterRepository dlqRepo,
         IRandomProvider random,
-        IOutboxRepository outboxRep)
+        IOutboxRepository outboxRep,
+        ILogger<RunExecutionCommandHandler> logger)
     {
         _taskRepo = taskRepo;
         _httpExecutor = httpExecutor;
@@ -43,6 +45,7 @@ public sealed class RunExecutionCommandHandler : ICommandHandler<RunExecutionCom
         _dlqRepo = dlqRepo;
         _random = random;
         _outboxRepo = outboxRep;
+        _logger = logger;
     }
 
     public async Task HandleAsync(RunExecutionCommand command, CancellationToken cancellationToken = default)
@@ -73,6 +76,31 @@ public sealed class RunExecutionCommandHandler : ICommandHandler<RunExecutionCom
 
         if (task is null) return; // задача уже захвачена, отменена или не существует
 
+        // Проверяем, что стратегия выполнения загружена корректно
+        if (task.Strategy is null)
+        {
+            _logger.LogError("Task {TaskId} has null strategy, cannot execute. Moving to dead letter.", task.Id);
+            // Можно сразу пометить как Dead и сохранить через транзакцию
+            await _unitOfWork.BeginTransactionAsync(cancellationToken);
+            try
+            {
+                task.MarkFailed(utcNow, "Execution strategy is missing or corrupted");
+                // если статус Dead, добавляем в DLQ
+                if (task.Status == StatusTask.Dead)
+                {
+                    var snapshot = JsonSerializer.Serialize(TaskMapper.ToSnapshot(task));
+                    await _dlqRepo.AddAsync(new DeadLetterEntry(task.Id, task.SenderId, snapshot, "Missing strategy", utcNow), cancellationToken);
+                }
+                await _taskRepo.UpdateAsync(task, task.Version, cancellationToken);
+                await _unitOfWork.CommitAsync(cancellationToken);
+            }
+            catch
+            {
+                await _unitOfWork.RollbackAsync(cancellationToken);
+                throw;
+            }
+            return;
+        }
         // После захвата в задаче уже актуальный Status=Executing и LockedUntil
         // Можно выполнять HTTP-запрос
         var strategy = task.Strategy;
@@ -101,6 +129,7 @@ public sealed class RunExecutionCommandHandler : ICommandHandler<RunExecutionCom
         // ФАЗА 2: Фиксация результата (микро-транзакция)
         // Перезагружать задачу не нужно, т.к. мы её захватили и никто другой не менял.
         // -----------------------------------------------------------------
+        
         await _unitOfWork.BeginTransactionAsync(cancellationToken);
         try
         {

@@ -79,7 +79,7 @@ public sealed class TaskExecutionWorker : BackgroundService
                 var taskId = TaskId.From(message.TaskId);
                 _logger.LogDebug("Получено задание {TaskId}", taskId.Value);
 
-                using var scope = _scopeFactory.CreateScope();
+                await using var scope = _scopeFactory.CreateAsyncScope();
                 var handler = scope.ServiceProvider.GetRequiredService<ICommandHandler<RunExecutionCommand>>();
 
                 await handler.HandleAsync(new RunExecutionCommand(taskId.Value), stoppingToken);
