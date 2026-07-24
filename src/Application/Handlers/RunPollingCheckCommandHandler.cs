@@ -80,7 +80,7 @@ public sealed class RunPollingCheckCommandHandler : ICommandHandler<RunPollingCh
             HttpResponseResult response;
             try
             {
-                var http = (HttpExecutionConfig)acquiredTask.Strategy;
+                var http = (HttpExecutionConfig)acquiredTask.Execution;
                 var requestConfig = new HttpRequestConfig(http.Method, http.Url, http.Headers, http.Body)
                 {
                     Timeout = TimeSpan.FromSeconds(http.TimeoutSeconds ?? 30)

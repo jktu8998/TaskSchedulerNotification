@@ -19,7 +19,7 @@ public sealed class ScheduledTask : IHasDomainEvents
     public TaskType Type { get; private set; }
     public StatusTask Status { get; private set; }
     public Schedule Schedule { get; private set; }
-    public ExecutionStrategy Strategy { get; private set; }
+    public ExecutionStrategy Execution { get; private set; }
     public ResultDeliveryConfig? ResultDelivery { get; private set; }
     public PollingConfig? PollingConfig { get; private set; }
     public RetryPolicy RetryPolicy { get; private set; }
@@ -97,7 +97,7 @@ public sealed class ScheduledTask : IHasDomainEvents
         SenderId senderId,
         TaskType type,
         Schedule schedule,
-        ExecutionStrategy strategy,
+        ExecutionStrategy execution,
         ResultDeliveryConfig? resultDelivery,
         PollingConfig? pollingConfig,
         RetryPolicy? retryPolicy,
@@ -120,8 +120,8 @@ public sealed class ScheduledTask : IHasDomainEvents
         // Остальные обязательные параметры
         if (schedule is null)
             throw new ArgumentNullException(nameof(schedule));
-        if (strategy is null)
-            throw new ArgumentNullException(nameof(strategy));
+        if (execution is null)
+            throw new ArgumentNullException(nameof(execution));
         if (string.IsNullOrWhiteSpace(idempotencyKey))
             throw new ArgumentException("Idempotency key cannot be null or empty.", nameof(idempotencyKey));
         if (idempotencyKey.Length > 128)
@@ -133,7 +133,7 @@ public sealed class ScheduledTask : IHasDomainEvents
         Type = type;
         Status = StatusTask.Created;
         Schedule = schedule;
-        Strategy = strategy;
+        Execution = execution;
         ResultDelivery = resultDelivery;
         PollingConfig = pollingConfig;
         RetryPolicy = retryPolicy ?? RetryPolicy.Default;

@@ -24,7 +24,7 @@ public static class TaskMapper
             Type = task.Type.ToString(),
             Status = task.Status.ToString(),
             Schedule = MapSchedule(task.Schedule),
-            Execution = MapExecutionConfig(task.Strategy),
+            Execution = MapExecutionConfig(task.Execution),
             ResultDelivery = MapResultDelivery(task.ResultDelivery),
             PollingConfig = MapPollingConfig(task.PollingConfig),
             Retry = MapRetryPolicy(task.RetryPolicy),
@@ -51,7 +51,7 @@ public static class TaskMapper
             SenderId = task.SenderId.ToString(),
             Type = task.Type.ToString(),
             Schedule = MapSchedule(task.Schedule),
-            Execution = MapExecutionToDto(task.Strategy),
+            Execution = MapExecutionToDto(task.Execution),
             ResultDelivery = task.ResultDelivery is not null
                 ? new ResultDeliveryConfigDto
                 {

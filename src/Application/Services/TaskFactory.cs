@@ -114,7 +114,7 @@ public sealed class TaskFactory : ITaskFactory
 
         var task = new ScheduledTask(
             TaskId.New(), senderId, Enum.Parse<TaskType>(type, ignoreCase: true),
-            schedule, strategy, resultDelivery, pollingConfig, retryPolicy,
+            schedule, execution:strategy, resultDelivery, pollingConfig, retryPolicy,
             encryptedSensitive, utcNow, metadata,
             idempotencyKey,        // передаём
             rawPayload ?? string.Empty,

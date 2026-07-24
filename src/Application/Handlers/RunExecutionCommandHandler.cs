@@ -77,7 +77,7 @@ public sealed class RunExecutionCommandHandler : ICommandHandler<RunExecutionCom
         if (task is null) return; // задача уже захвачена, отменена или не существует
 
         // Проверяем, что стратегия выполнения загружена корректно
-        if (task.Strategy is null)
+        if (task.Execution is null)
         {
             _logger.LogError("Task {TaskId} has null strategy, cannot execute. Moving to dead letter.", task.Id);
             // Можно сразу пометить как Dead и сохранить через транзакцию
@@ -103,7 +103,7 @@ public sealed class RunExecutionCommandHandler : ICommandHandler<RunExecutionCom
         }
         // После захвата в задаче уже актуальный Status=Executing и LockedUntil
         // Можно выполнять HTTP-запрос
-        var strategy = task.Strategy;
+        var strategy = task.Execution;
         var timeout = strategy.TimeoutSeconds ?? 30;
 
         var request = new HttpRequestConfig(

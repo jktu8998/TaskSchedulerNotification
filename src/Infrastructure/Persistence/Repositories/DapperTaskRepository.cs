@@ -38,7 +38,7 @@ public sealed class DapperTaskRepository : ITaskRepository
             @Id, @ChainId, @ChainStepIndex,
             @SenderId, @IdempotencyKey,
             @Type, @Status,
-            @Schedule::jsonb, @Strategy::jsonb,
+            @Schedule::jsonb, @Execution::jsonb,
             @ResultDelivery::jsonb, @PollingConfig::jsonb, @RetryPolicy::jsonb,
             @EncryptedSensitiveData, @RawPayload::jsonb,
             @CreatedAt, @UpdatedAt,
@@ -64,7 +64,7 @@ public sealed class DapperTaskRepository : ITaskRepository
 
     // JSONB-поля: сериализуем в JSON-строку, передаём как строку, а в SQL явно приводим к jsonb
     parameters.Add("Schedule", JsonSerializer.Serialize(task.Schedule, jsonOptions), DbType.String);
-    parameters.Add("Strategy", JsonSerializer.Serialize(task.Strategy, jsonOptions), DbType.String);
+    parameters.Add("Execution", JsonSerializer.Serialize(task.Execution, jsonOptions), DbType.String);
     parameters.Add("ResultDelivery",
         task.ResultDelivery != null ? JsonSerializer.Serialize(task.ResultDelivery, jsonOptions) : DBNull.Value,
         DbType.String);
@@ -188,7 +188,7 @@ public sealed class DapperTaskRepository : ITaskRepository
             type = @Type,
             status = @Status,
             schedule = @Schedule::jsonb,
-            execution = @Strategy::jsonb,
+            execution = @Execution::jsonb,
             result_delivery = @ResultDelivery::jsonb,
             polling_config = @PollingConfig::jsonb,
             retry_policy = @RetryPolicy::jsonb,
@@ -222,7 +222,7 @@ public sealed class DapperTaskRepository : ITaskRepository
 
     // JSONB-поля: сериализуем в строку и передаём как строку
     parameters.Add("Schedule", JsonSerializer.Serialize(task.Schedule, jsonOptions), DbType.String);
-    parameters.Add("Strategy", JsonSerializer.Serialize(task.Strategy, jsonOptions), DbType.String);
+    parameters.Add("Execution", JsonSerializer.Serialize(task.Execution, jsonOptions), DbType.String);
     parameters.Add("ResultDelivery",
         task.ResultDelivery != null ? JsonSerializer.Serialize(task.ResultDelivery, jsonOptions) : DBNull.Value,
         DbType.String);

@@ -21,13 +21,13 @@ public static class DapperTypeHandlerConfig
         _registered = true;
         Dapper.DefaultTypeMap.MatchNamesWithUnderscores = true;
         
-        // Кастомный маппинг для ScheduledTask: столбец "execution" -> свойство "Strategy"
+        // Кастомный маппинг для ScheduledTask: столбец "execution" -> свойство "Execution"
         // var taskMap = new CustomPropertyTypeMap(
         //     typeof(ScheduledTask),
         //     (type, columnName) =>
         //     {
         //         if (columnName.Equals("execution", StringComparison.OrdinalIgnoreCase))
-        //             return type.GetProperty("Strategy");
+        //             return type.GetProperty("Execution");
         //         // Для остальных столбцов оставляем стандартное поведение
         //         return type.GetProperty(columnName, BindingFlags.IgnoreCase | BindingFlags.Public | BindingFlags.Instance);
         //     });
