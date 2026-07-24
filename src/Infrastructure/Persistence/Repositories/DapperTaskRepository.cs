@@ -1,9 +1,13 @@
+using System.Data;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Dapper;
 using Domain.Entities;
 using Domain.Enums;
 using Domain.Exceptions;
 using Domain.Interfaces;
 using Domain.ValueObjects;
+using Infrastructure.Persistence.TypeHandlers;
 
 namespace Infrastructure.Persistence.Repositories;
 
@@ -16,57 +20,75 @@ public sealed class DapperTaskRepository : ITaskRepository
         _db = db;
     }
 
-    public async Task AddAsync(ScheduledTask task, CancellationToken ct = default)
-    {
-        const string sql = @"
-            INSERT INTO tasks (
-                id, sender_id, idempotency_key,
-                type, status,
-                schedule, execution,
-                result_delivery, polling_config, retry_policy,
-                encrypted_sensitive_data, raw_payload,
-                created_at, updated_at,
-                next_execution_at, locked_until, scheduled_at,
-                current_attempt, version, metadata,
-                chain_id, chain_step_index               
-            ) VALUES (
-                @Id,@ChainId, @ChainStepIndex, 
-                @SenderId, @IdempotencyKey,
-                @Type, @Status,
-                @Schedule, @Strategy,
-                @ResultDelivery, @PollingConfig, @RetryPolicy,
-                @EncryptedSensitiveData, @RawPayload,
-                @CreatedAt, @UpdatedAt,
-                @NextExecutionAt, @LockedUntil, @ScheduledAt,
-                @CurrentAttempt, @Version, @Metadata
-            )";
+   public async Task AddAsync(ScheduledTask task, CancellationToken ct = default)
+{
+    // Добавляем явное приведение типов для JSONB-полей: ::jsonb
+    const string sql = @"
+        INSERT INTO tasks (
+            id, chain_id, chain_step_index,
+            sender_id, idempotency_key,
+            type, status,
+            schedule, execution,
+            result_delivery, polling_config, retry_policy,
+            encrypted_sensitive_data, raw_payload,
+            created_at, updated_at,
+            next_execution_at, locked_until, scheduled_at,
+            current_attempt, version, metadata
+        ) VALUES (
+            @Id, @ChainId, @ChainStepIndex,
+            @SenderId, @IdempotencyKey,
+            @Type, @Status,
+            @Schedule::jsonb, @Strategy::jsonb,
+            @ResultDelivery::jsonb, @PollingConfig::jsonb, @RetryPolicy::jsonb,
+            @EncryptedSensitiveData, @RawPayload::jsonb,
+            @CreatedAt, @UpdatedAt,
+            @NextExecutionAt, @LockedUntil, @ScheduledAt,
+            @CurrentAttempt, @Version, @Metadata::jsonb
+        )";
 
-        await _db.Connection.ExecuteAsync(sql, new
-        {
-            task.Id,
-            task.SenderId,
-            task.IdempotencyKey,
-            task.Type,
-            task.Status,
-            task.Schedule,
-            Strategy = task.Strategy,         // было task.Execution
-            ResultDelivery = task.ResultDelivery,
-            PollingConfig = task.PollingConfig,
-            task.RetryPolicy,
-            task.EncryptedSensitiveData,
-            task.RawPayload,
-            task.CreatedAt,
-            task.UpdatedAt,
-            task.NextExecutionAt,
-            task.LockedUntil,
-            task.ScheduledAt,
-            task.CurrentAttempt,
-            task.Version,
-            Metadata = task.Metadata ,          // будет обработан TypeHandler'ом
-            ChainId = (object?)task.ChainId ?? DBNull.Value,
-            ChainStepIndex = (object?)task.ChainStepIndex ?? DBNull.Value
-        }, transaction: _db.Transaction);
-    }
+    var jsonOptions = new JsonSerializerOptions
+    {
+        PropertyNameCaseInsensitive = true,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        Converters = { new ExecutionStrategyJsonConverter() }
+    };
+
+    var parameters = new DynamicParameters();
+    parameters.Add("Id", task.Id.Value, DbType.Guid);
+    parameters.Add("ChainId", (object?)task.ChainId ?? DBNull.Value, DbType.Guid);
+    parameters.Add("ChainStepIndex", (object?)task.ChainStepIndex ?? DBNull.Value, DbType.Int32);
+    parameters.Add("SenderId", task.SenderId.Value, DbType.String);
+    parameters.Add("IdempotencyKey", task.IdempotencyKey, DbType.String);
+    parameters.Add("Type", (int)task.Type, DbType.Int32);
+    parameters.Add("Status", (int)task.Status, DbType.Int32);
+
+    // JSONB-поля: сериализуем в JSON-строку, передаём как строку, а в SQL явно приводим к jsonb
+    parameters.Add("Schedule", JsonSerializer.Serialize(task.Schedule, jsonOptions), DbType.String);
+    parameters.Add("Strategy", JsonSerializer.Serialize(task.Strategy, jsonOptions), DbType.String);
+    parameters.Add("ResultDelivery",
+        task.ResultDelivery != null ? JsonSerializer.Serialize(task.ResultDelivery, jsonOptions) : DBNull.Value,
+        DbType.String);
+    parameters.Add("PollingConfig",
+        task.PollingConfig != null ? JsonSerializer.Serialize(task.PollingConfig, jsonOptions) : DBNull.Value,
+        DbType.String);
+    parameters.Add("RetryPolicy", JsonSerializer.Serialize(task.RetryPolicy, jsonOptions), DbType.String);
+    parameters.Add("Metadata",
+        task.Metadata != null ? JsonSerializer.Serialize(task.Metadata, jsonOptions) : DBNull.Value,
+        DbType.String);
+
+    // Остальные параметры
+    parameters.Add("EncryptedSensitiveData", (object?)task.EncryptedSensitiveData ?? DBNull.Value, DbType.String);
+    parameters.Add("RawPayload", task.RawPayload, DbType.String);
+    parameters.Add("CreatedAt", task.CreatedAt, DbType.DateTimeOffset);
+    parameters.Add("UpdatedAt", task.UpdatedAt, DbType.DateTimeOffset);
+    parameters.Add("NextExecutionAt", (object?)task.NextExecutionAt ?? DBNull.Value, DbType.DateTimeOffset);
+    parameters.Add("LockedUntil", (object?)task.LockedUntil ?? DBNull.Value, DbType.DateTimeOffset);
+    parameters.Add("ScheduledAt", (object?)task.ScheduledAt ?? DBNull.Value, DbType.DateTimeOffset);
+    parameters.Add("CurrentAttempt", task.CurrentAttempt, DbType.Int32);
+    parameters.Add("Version", task.Version, DbType.Int32);
+
+    await _db.Connection.ExecuteAsync(sql, parameters, transaction: _db.Transaction);
+}
 
     public async Task<ScheduledTask?> GetByIdAsync(TaskId id, CancellationToken ct = default)
     {
@@ -157,62 +179,80 @@ public sealed class DapperTaskRepository : ITaskRepository
         return result.AsList();
     }
 
-    public async Task UpdateAsync(ScheduledTask task, int expectedVersion, CancellationToken ct = default)
+   public async Task UpdateAsync(ScheduledTask task, int expectedVersion, CancellationToken ct = default)
+{
+    // В SQL-шаблоне все JSONB-поля принимают строку и явно приводятся к jsonb (::jsonb)
+    const string sql = @"
+        UPDATE tasks SET
+            sender_id = @SenderId,
+            type = @Type,
+            status = @Status,
+            schedule = @Schedule::jsonb,
+            execution = @Strategy::jsonb,
+            result_delivery = @ResultDelivery::jsonb,
+            polling_config = @PollingConfig::jsonb,
+            retry_policy = @RetryPolicy::jsonb,
+            encrypted_sensitive_data = @EncryptedSensitiveData,
+            raw_payload = @RawPayload::jsonb,
+            updated_at = @UpdatedAt,
+            next_execution_at = @NextExecutionAt,
+            locked_until = @LockedUntil,
+            scheduled_at = @ScheduledAt,
+            current_attempt = @CurrentAttempt,
+            version = version + 1,
+            metadata = @Metadata::jsonb,
+            chain_id = @ChainId,
+            chain_step_index = @ChainStepIndex
+        WHERE id = @Id AND version = @ExpectedVersion
+        RETURNING version";
+
+    // Единые настройки сериализации для JSONB (как в AddAsync)
+    var jsonOptions = new JsonSerializerOptions
     {
-        const string sql = @"
-            UPDATE tasks SET
-                sender_id = @SenderId,
-                type = @Type,
-                status = @Status,
-                schedule = @Schedule,
-                execution = @Strategy,
-                result_delivery = @ResultDelivery,
-                polling_config = @PollingConfig,
-                retry_policy = @RetryPolicy,
-                encrypted_sensitive_data = @EncryptedSensitiveData,
-                raw_payload = @RawPayload,
-                updated_at = @UpdatedAt,
-                next_execution_at = @NextExecutionAt,
-                locked_until = @LockedUntil,
-                scheduled_at = @ScheduledAt,
-                current_attempt = @CurrentAttempt,
-                version = version + 1,
-                metadata = @Metadata,
-                chain_id = @ChainId,         
-                chain_step_index = @ChainStepIndex 
-            WHERE id = @Id AND version = @ExpectedVersion
-            RETURNING version";
+        PropertyNameCaseInsensitive = true,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        Converters = { new ExecutionStrategyJsonConverter() }
+    };
 
-        var newVersion = await _db.Connection.QuerySingleOrDefaultAsync<int?>(
-            sql,
-            new
-            {
-                task.Id,
-                task.SenderId,
-                task.Type,
-                task.Status,
-                task.Schedule,
-                Strategy = task.Strategy,            
-                ResultDelivery = task.ResultDelivery,
-                PollingConfig = task.PollingConfig,
-                task.RetryPolicy,
-                task.EncryptedSensitiveData,
-                task.RawPayload,
-                task.UpdatedAt,
-                task.NextExecutionAt,
-                task.LockedUntil,
-                task.ScheduledAt,
-                task.CurrentAttempt,
-                ExpectedVersion = expectedVersion,
-                Metadata = task.Metadata,
-                ChainId = (object?)task.ChainId ?? DBNull.Value,
-                ChainStepIndex = (object?)task.ChainStepIndex ?? DBNull.Value
-            },
-            transaction: _db.Transaction);
+    var parameters = new DynamicParameters();
+    parameters.Add("Id", task.Id.Value, DbType.Guid);
+    parameters.Add("SenderId", task.SenderId.Value, DbType.String);
+    parameters.Add("Type", (int)task.Type, DbType.Int32);          // enum -> int
+    parameters.Add("Status", (int)task.Status, DbType.Int32);      // enum -> int
 
-        if (newVersion == null)
-            throw new ConcurrencyException(task.Id.Value, expectedVersion);
-    }
+    // JSONB-поля: сериализуем в строку и передаём как строку
+    parameters.Add("Schedule", JsonSerializer.Serialize(task.Schedule, jsonOptions), DbType.String);
+    parameters.Add("Strategy", JsonSerializer.Serialize(task.Strategy, jsonOptions), DbType.String);
+    parameters.Add("ResultDelivery",
+        task.ResultDelivery != null ? JsonSerializer.Serialize(task.ResultDelivery, jsonOptions) : DBNull.Value,
+        DbType.String);
+    parameters.Add("PollingConfig",
+        task.PollingConfig != null ? JsonSerializer.Serialize(task.PollingConfig, jsonOptions) : DBNull.Value,
+        DbType.String);
+    parameters.Add("RetryPolicy", JsonSerializer.Serialize(task.RetryPolicy, jsonOptions), DbType.String);
+    parameters.Add("Metadata",
+        task.Metadata != null ? JsonSerializer.Serialize(task.Metadata, jsonOptions) : DBNull.Value,
+        DbType.String);
+
+    parameters.Add("EncryptedSensitiveData", (object?)task.EncryptedSensitiveData ?? DBNull.Value, DbType.String);
+    parameters.Add("RawPayload", task.RawPayload, DbType.String);
+    parameters.Add("UpdatedAt", task.UpdatedAt, DbType.DateTimeOffset);
+    parameters.Add("NextExecutionAt", (object?)task.NextExecutionAt ?? DBNull.Value, DbType.DateTimeOffset);
+    parameters.Add("LockedUntil", (object?)task.LockedUntil ?? DBNull.Value, DbType.DateTimeOffset);
+    parameters.Add("ScheduledAt", (object?)task.ScheduledAt ?? DBNull.Value, DbType.DateTimeOffset);
+    parameters.Add("CurrentAttempt", task.CurrentAttempt, DbType.Int32);
+    // Version не передаём — он вычисляется в SQL как version + 1
+    parameters.Add("ExpectedVersion", expectedVersion, DbType.Int32);
+    parameters.Add("ChainId", (object?)task.ChainId ?? DBNull.Value, DbType.Guid);
+    parameters.Add("ChainStepIndex", (object?)task.ChainStepIndex ?? DBNull.Value, DbType.Int32);
+
+    // Выполняем UPDATE и получаем новую версию
+    var newVersion = await _db.Connection.QuerySingleOrDefaultAsync<int?>(
+        sql, parameters, transaction: _db.Transaction);
+
+    if (newVersion == null)
+        throw new ConcurrencyException(task.Id.Value, expectedVersion);
+}
 
     public async Task BulkUpdateAsync(IReadOnlyCollection<ScheduledTask> tasks, CancellationToken ct = default)
     {

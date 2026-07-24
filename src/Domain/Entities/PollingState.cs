@@ -27,5 +27,5 @@ public sealed class PollingState
         LastResponseJson = responseJson;
         LastCheckedAt = utcNow;
     }
-    private PollingState() { } // для Dapper
+    public PollingState() { } // для Dapper
 }

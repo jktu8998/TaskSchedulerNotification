@@ -15,9 +15,22 @@ internal sealed class ScopedDbTransactionContext : IDbTransactionContext, IAsync
     private NpgsqlTransaction? _transaction;
     private bool _disposed;
 
-    public IDbConnection Connection =>
-        _connection ?? throw new InvalidOperationException("Transaction not started. Call BeginTransactionAsync first.");
+    // Признак, что транзакция была начата явно (через BeginTransactionAsync)
+    private bool _transactionStarted;
 
+    public IDbConnection Connection
+    {
+        get
+        {
+            // Ленивое открытие соединения, если ещё не открыто
+            if (_connection == null)
+            {
+                _connection = _factory.CreateConnection();
+                _connection.Open(); // синхронное открытие безопасно в провайдере Npgsql
+            }
+            return _connection;
+        }
+    }
     public IDbTransaction? Transaction => _transaction;
 
     public ScopedDbTransactionContext(IDbConnectionFactory factory)
@@ -27,18 +40,30 @@ internal sealed class ScopedDbTransactionContext : IDbTransactionContext, IAsync
 
     public async Task BeginTransactionAsync(CancellationToken ct = default)
     {
-        if (_connection != null)
-            throw new InvalidOperationException("Transaction already started.");
+        // Если транзакция уже начата — ничего не делаем (идемпотентность)
+        if (_transaction != null)
+            return;
 
-        _connection = _factory.CreateConnection();
-        await _connection.OpenAsync(ct);
+        // Убедимся, что соединение открыто (если ещё нет — откроем)
+        if (_connection == null)
+        {
+            _connection = _factory.CreateConnection();
+            await _connection.OpenAsync(ct);
+        }
+        else if (_connection.State != System.Data.ConnectionState.Open)
+        {
+            // маловероятно, но на всякий случай
+            await _connection.OpenAsync(ct);
+        }
+
         _transaction = await _connection.BeginTransactionAsync(ct);
+        _transactionStarted = true;
     }
 
     public async Task CommitAsync(CancellationToken ct = default)
     {
         if (_transaction == null)
-            throw new InvalidOperationException("No active transaction.");
+            throw new InvalidOperationException("No active transaction to commit.");
 
         await _transaction.CommitAsync(ct);
         await CleanupAsync();
@@ -47,7 +72,7 @@ internal sealed class ScopedDbTransactionContext : IDbTransactionContext, IAsync
     public async Task RollbackAsync(CancellationToken ct = default)
     {
         if (_transaction == null)
-            throw new InvalidOperationException("No active transaction.");
+            throw new InvalidOperationException("No active transaction to rollback.");
 
         await _transaction.RollbackAsync(ct);
         await CleanupAsync();
@@ -73,11 +98,19 @@ internal sealed class ScopedDbTransactionContext : IDbTransactionContext, IAsync
         if (_disposed) return;
         _disposed = true;
 
-        // Если транзакция всё ещё активна при завершении скоупа – откатываем
+        // Если есть активная транзакция (не закоммиченная) — откатываем
         if (_transaction != null)
         {
             try { await _transaction.RollbackAsync(); } catch { /* игнорируем */ }
+            await _transaction.DisposeAsync();
         }
-        await CleanupAsync();
+
+        if (_connection != null)
+        {
+            if (_connection.State == System.Data.ConnectionState.Open)
+                await _connection.CloseAsync();
+            await _connection.DisposeAsync();
+        }
+        ;
     }
 }

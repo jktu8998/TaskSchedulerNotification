@@ -23,5 +23,5 @@ public sealed class TaskLog
         Message = message;
         Details = details;
     }
-    private TaskLog() { } // для Dapper
+    public TaskLog() { } // для Dapper
 }

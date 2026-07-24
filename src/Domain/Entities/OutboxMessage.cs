@@ -72,5 +72,5 @@ public sealed class OutboxMessage
         return true;
     }
 
-    private OutboxMessage() { } // для Dapper
+    public OutboxMessage() { } // для Dapper
 }

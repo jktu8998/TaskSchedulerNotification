@@ -65,7 +65,7 @@ public sealed record HttpExecutionConfig : ExecutionStrategy
     }
 
     // Пустой конструктор для Dapper/десериализации
-    private HttpExecutionConfig() : base() { }
+    public HttpExecutionConfig() : base() { }
 
     /// <summary>
     /// Сравнение с учётом заголовков и тела.

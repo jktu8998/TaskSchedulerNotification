@@ -86,7 +86,7 @@ public sealed record ChainStep
     }
 
     // Пустой конструктор для десериализации/маппера
-    private ChainStep() { }
+    public ChainStep() { }
 
     // Структурное сравнение
     public bool Equals(ChainStep? other)

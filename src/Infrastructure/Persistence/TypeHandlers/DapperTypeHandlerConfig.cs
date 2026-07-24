@@ -20,6 +20,7 @@ public static class DapperTypeHandlerConfig
         Dapper.DefaultTypeMap.MatchNamesWithUnderscores = true;
         // TaskId ↔ Guid
         SqlMapper.AddTypeHandler(new TaskIdTypeHandler());
+        SqlMapper.AddTypeHandler(new SenderIdTypeHandler());
 
         // Enums ↔ int
         SqlMapper.AddTypeHandler(new EnumTypeHandler<StatusTask>());

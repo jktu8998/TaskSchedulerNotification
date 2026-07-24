@@ -1,5 +1,6 @@
 
 using System.Collections.Immutable;
+using System.Text.Json.Serialization;
 
 namespace Domain.ValueObjects;
 
@@ -20,6 +21,7 @@ public sealed record RetryPolicy
     /// <summary>
     /// Максимальное количество попыток (включая первую).
     /// </summary>
+    [JsonIgnore]  // ← исключаем из JSON, оно вычисляется
     public int MaxAttempts => IntervalsSeconds.Length;
 
     
@@ -29,6 +31,13 @@ public sealed record RetryPolicy
     /// </summary>
     public static RetryPolicy Default => new(new[] { 60, 60, 60, 60, 60 });
     
+    // Публичный конструктор без параметров для десериализации
+    public RetryPolicy()
+    {
+        IntervalsSeconds = ImmutableArray<int>.Empty; // или значение по умолчанию
+    }
+    // Основной конструктор с указанием для System.Text.Json
+    [JsonConstructor]
     public RetryPolicy(IReadOnlyList<int> intervalsSeconds)
     {
         // 1. Null check

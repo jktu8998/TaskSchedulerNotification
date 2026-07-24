@@ -77,7 +77,7 @@ public sealed class ScheduledTask : IHasDomainEvents
     public DateTime? ScheduledAt { get; private set; }
 
     // Пустой конструктор для маппинга из БД (Dapper)
-    private ScheduledTask() { }
+    public ScheduledTask() { }
 
     /// <summary>
     /// Создаёт новое задание в статусе Created.

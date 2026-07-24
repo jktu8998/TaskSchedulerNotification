@@ -39,7 +39,7 @@ public sealed class JobChain : IHasDomainEvents
     public IReadOnlyCollection<IDomainEvent> DomainEvents => _domainEvents.AsReadOnly();
 
     // Пустой конструктор для маппинга (Dapper)
-    private JobChain() { }
+    public JobChain() { }
 
     /// <summary>
     /// Создаёт новую цепочку в статусе Created.

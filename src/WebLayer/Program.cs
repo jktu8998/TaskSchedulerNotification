@@ -120,7 +120,7 @@ using (var scope = app.Services.CreateScope())
 //     app.UseSwagger();
 //     app.UseSwaggerUI();
 // }
-
+app.UseRouting();
 app.UseSerilogRequestLogging();
 
 app.UseHttpsRedirection();
@@ -129,6 +129,9 @@ app.UseCors();
 
 app.UseAuthentication();
 app.UseAuthorization();
+// Middleware контекста запроса (должен идти после аутентификации)
+app.UseMiddleware<RequestContextMiddleware>(); 
+app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseSwagger();
 app.UseSwaggerUI(options =>
 {
@@ -139,9 +142,7 @@ app.UseSwaggerUI(options =>
             description.GroupName.ToUpperInvariant());
     }
 });
-// Middleware контекста запроса (должен идти после аутентификации)
-app.UseMiddleware<RequestContextMiddleware>(); 
-app.UseMiddleware<ExceptionHandlingMiddleware>();
+
 
 app.MapControllers();
 

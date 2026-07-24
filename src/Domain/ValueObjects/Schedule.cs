@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Cronos;
 
 namespace Domain.ValueObjects;
@@ -23,7 +24,7 @@ public sealed record Schedule
     private CronExpression? _parsedCron;
 
     // Пустой конструктор для Dapper (без валидации, без парсинга)
-    private Schedule() { }
+    public Schedule() { }
 
     // Приватный конструктор — только фабрики
     private Schedule(
@@ -83,9 +84,9 @@ public sealed record Schedule
     public static Schedule FromCron(string cronExpression, string timezone)
         => new(null, null, cronExpression, timezone);
 
-    public bool IsAbsolute => ExecuteAt.HasValue;
-    public bool IsOffset => Offset.HasValue;
-    public bool IsCron => !string.IsNullOrWhiteSpace(CronExpression);
+    [JsonIgnore]public bool IsAbsolute => ExecuteAt.HasValue;
+    [JsonIgnore]public bool IsOffset => Offset.HasValue;
+    [JsonIgnore]public bool IsCron => !string.IsNullOrWhiteSpace(CronExpression);
 
     /// <summary>
     /// Вычисляет следующее время выполнения.
