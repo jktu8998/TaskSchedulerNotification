@@ -170,10 +170,10 @@ public sealed class RunExecutionCommandHandler : ICommandHandler<RunExecutionCom
             {
                 var deliveryPayload = JsonSerializer.Serialize(new
                 {
-                    mode = task.ResultDelivery.Mode.ToString(),
-                    url = task.ResultDelivery.Url,
-                    method = task.ResultDelivery.Method,
-                    body = task.ResultDelivery.Mode == ResultDeliveryMode.ForwardResponse
+                    Mode = task.ResultDelivery.Mode.ToString(),
+                    Url = task.ResultDelivery.Url,
+                    Method = task.ResultDelivery.Method,
+                    Body = task.ResultDelivery.Mode == ResultDeliveryMode.ForwardResponse
                         ? response.Body
                         : task.ResultDelivery.Params
                 });

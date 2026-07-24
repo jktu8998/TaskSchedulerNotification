@@ -138,10 +138,10 @@ public sealed class RunPollingCheckCommandHandler : ICommandHandler<RunPollingCh
             {
                 var deliveryPayload = JsonSerializer.Serialize(new
                 {
-                    mode = acquiredTask.ResultDelivery.Mode.ToString(),
-                    url = acquiredTask.ResultDelivery.Url,
-                    method = acquiredTask.ResultDelivery.Method,
-                    body = acquiredTask.ResultDelivery.Mode == ResultDeliveryMode.ForwardResponse
+                    Mode = acquiredTask.ResultDelivery.Mode.ToString(),
+                    Url = acquiredTask.ResultDelivery.Url,
+                    Method = acquiredTask.ResultDelivery.Method,
+                    Body = acquiredTask.ResultDelivery.Mode == ResultDeliveryMode.ForwardResponse
                         ? response.Body
                         : acquiredTask.ResultDelivery.Params
                 });
