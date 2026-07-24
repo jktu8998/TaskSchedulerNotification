@@ -209,27 +209,6 @@ public sealed class RunExecutionCommandHandler : ICommandHandler<RunExecutionCom
             throw;
         }
 
-        /*// Доставка результата (вне транзакции)
-        if (response.IsSuccess && task.ResultDelivery is not null)
-        {
-            try
-            {
-                var deliveryConfig = task.ResultDelivery;
-                HttpRequestConfig deliveryRequest;
-                if (deliveryConfig.Mode == ResultDeliveryMode.ForwardResponse)
-                {
-                    deliveryRequest = new HttpRequestConfig(deliveryConfig.Method, deliveryConfig.Url, null, response.Body);
-                }
-                else
-                {
-                    deliveryRequest = new HttpRequestConfig(deliveryConfig.Method, deliveryConfig.Url, null, deliveryConfig.Params);
-                }
-                await _httpExecutor.ExecuteAsync(deliveryRequest, cancellationToken);
-            }
-            catch
-            {
-                // TODO: логировать ошибку доставки
-            }
-        }*/
+        
     }
 }

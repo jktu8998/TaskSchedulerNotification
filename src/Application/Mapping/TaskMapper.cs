@@ -109,7 +109,7 @@ public static class TaskMapper
 
     // Приватные хелперы маппинга составных частей ответа
     public static ExecutionConfigDto MapExecutionToDto(ExecutionStrategy strategy) => MapExecutionConfig(strategy);
-
+    
     private static ScheduleDto MapSchedule(Schedule schedule) => new()
     {
         ExecuteAt = schedule.ExecuteAt?.ToString("o"),
@@ -120,6 +120,14 @@ public static class TaskMapper
 
     private static ExecutionConfigDto MapExecutionConfig(ExecutionStrategy strategy)
     {
+        if (strategy is null)
+        {
+            // Логируем, что задание повреждено, но не роняем весь список
+            return new ExecutionConfigDto
+            {
+                ExecutionType = "unknown"
+            };
+        }
         if (strategy is HttpExecutionConfig http)
         {
             return new ExecutionConfigDto

@@ -19,9 +19,17 @@ public sealed record PollingConfig
             throw new ArgumentException("Field cannot be null or empty.", nameof(field));
 
         // Если задано условие, должно быть и значение для сравнения
-        if (!string.IsNullOrWhiteSpace(condition) && string.IsNullOrWhiteSpace(value))
-            throw new ArgumentException(
-                "Value must be provided when a condition is specified.", nameof(value));
+        // if (!string.IsNullOrWhiteSpace(condition) && string.IsNullOrWhiteSpace(value))
+        //     throw new ArgumentException(
+        //         "Value must be provided when a condition is specified.", nameof(value));
+        // Для условий, которым не нужно значение (changed, not_equal), разрешаем пустое value.
+        if (!string.IsNullOrWhiteSpace(condition) 
+            && !string.Equals(condition, "changed", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(condition, "not_equal", StringComparison.OrdinalIgnoreCase)
+            && string.IsNullOrWhiteSpace(value))
+        {
+            throw new ArgumentException("Value must be provided for condition '" + condition + "'.", nameof(value));
+        }
 
         // Интервал опроса должен быть положительным
         if (intervalSeconds <= 0)
